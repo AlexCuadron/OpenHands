@@ -25,6 +25,7 @@ class StreamingLLM(AsyncLLM):
             temperature=self.config.temperature,
             top_p=self.config.top_p,
             drop_params=self.config.drop_params,
+            reasoning_effort=self.config.reasoning_effort,
             stream=True,  # Ensure streaming is enabled
         )
 
