@@ -2,7 +2,13 @@
 
 # Get the directory where the script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-cd "$SCRIPT_DIR/.." || exit 1
+BENCH_DIR="$( cd "$SCRIPT_DIR/.." &> /dev/null && pwd )"
+ROOT_DIR="$( cd "$BENCH_DIR/../../.." &> /dev/null && pwd )"
+
+# Add OpenHands root to PYTHONPATH
+export PYTHONPATH="${ROOT_DIR}:${PYTHONPATH:-}"
+
+cd "$BENCH_DIR" || exit 1
 
 # Default values
 AGENT_CLS="CodeActAgent"

@@ -11,11 +11,11 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 from datasets import load_dataset
 
-from .helper.prompts import (
+from evaluation.benchmarks.polyglot_aider_bench.helper.prompts import (
     INSTRUCTIONS_ADDENDUM,
     TEST_FAILURES,
 )
-from ....utils.shared import (
+from evaluation.utils.shared import (
     EvalMetadata,
     EvalOutput,
     compatibility_for_eval_history_pairs,
