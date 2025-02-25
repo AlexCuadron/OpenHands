@@ -8,6 +8,13 @@ ROOT_DIR="$( cd "$BENCH_DIR/../../.." &> /dev/null && pwd )"
 # Add OpenHands root to PYTHONPATH
 export PYTHONPATH="${ROOT_DIR}:${PYTHONPATH:-}"
 
+# Install dependencies if not already installed
+if [ ! -f "$BENCH_DIR/.deps_installed" ]; then
+    echo "Installing dependencies..."
+    pip install -r "$BENCH_DIR/requirements.txt"
+    touch "$BENCH_DIR/.deps_installed"
+fi
+
 cd "$BENCH_DIR" || exit 1
 
 # Default values
