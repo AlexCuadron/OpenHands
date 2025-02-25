@@ -35,7 +35,7 @@ from openhands.core.config import (
 # Override openhands logger to use our color module
 import sys
 from openhands.core import logger as oh_logger
-from .helper.color import colored
+from evaluation.benchmarks.polyglot_aider_bench.helper.color import colored
 oh_logger.colored = colored
 from openhands.core.logger import openhands_logger as logger
 from openhands.core.main import create_runtime, run_controller
