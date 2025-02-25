@@ -1,93 +1,60 @@
 #!/bin/bash
+set -eo pipefail
 
-# Get the directory where the script is located
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-BENCH_DIR="$( cd "$SCRIPT_DIR/.." &> /dev/null && pwd )"
-ROOT_DIR="$( cd "$BENCH_DIR/../../.." &> /dev/null && pwd )"
+source "evaluation/utils/version_control.sh"
 
-# Add OpenHands root to PYTHONPATH
-export PYTHONPATH="${ROOT_DIR}:${PYTHONPATH:-}"
+MODEL_CONFIG=$1
+COMMIT_HASH=$2
+AGENT=$3
+EVAL_LIMIT=$4
+NUM_WORKERS=$5
+EVAL_IDS=$6
 
-cd "$BENCH_DIR" || exit 1
+if [ -z "$NUM_WORKERS" ]; then
+  NUM_WORKERS=1
+  echo "Number of workers not specified, use default $NUM_WORKERS"
+fi
+checkout_eval_branch
 
-# Default values
-AGENT_CLS="CodeActAgent"
-EVAL_NOTE=""
-EVAL_OUTPUT_DIR="eval_output"
-EVAL_NUM_WORKERS=1
-EVAL_N_LIMIT=-1
-LLM_CONFIG=""
-EVAL_IDS=""
-
-# Check if using positional arguments (old style)
-if [[ $# -ge 5 && "$1" != "--"* ]]; then
-    # Old style: <model> <commit> <agent> <max_iters> <num_workers>
-    MODEL="$1"
-    COMMIT="$2"
-    AGENT_CLS="$3"
-    MAX_ITERS="$4"
-    EVAL_NUM_WORKERS="$5"
-
-    # Convert to new style arguments
-    LLM_CONFIG="configs/llm/${MODEL}.yaml"
-    EVAL_NOTE="${COMMIT}"
-    MAX_ITERATIONS="--max-iterations ${MAX_ITERS}"
-else
-    # Parse named arguments (new style)
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            --agent-cls)
-                AGENT_CLS="$2"
-                shift 2
-                ;;
-            --eval-note)
-                EVAL_NOTE="$2"
-                shift 2
-                ;;
-            --eval-output-dir)
-                EVAL_OUTPUT_DIR="$2"
-                shift 2
-                ;;
-            --eval-num-workers)
-                EVAL_NUM_WORKERS="$2"
-                shift 2
-                ;;
-            --eval-n-limit)
-                EVAL_N_LIMIT="$2"
-                shift 2
-                ;;
-            --llm-config)
-                LLM_CONFIG="$2"
-                shift 2
-                ;;
-            --eval-ids)
-                EVAL_IDS="$2"
-                shift 2
-                ;;
-            *)
-                echo "Unknown argument: $1"
-                exit 1
-                ;;
-        esac
-    done
+if [ -z "$AGENT" ]; then
+  echo "Agent not specified, use default CodeActAgent"
+  AGENT="CodeActAgent"
 fi
 
-# Check required arguments
-if [ -z "$LLM_CONFIG" ]; then
-    echo "Error: LLM config is required"
-    echo "Usage:"
-    echo "  Old style: $0 <model> <commit> <agent> <max_iters> <num_workers>"
-    echo "  New style: $0 --llm-config <config> --agent-cls <agent> [other options]"
-    exit 1
+get_openhands_version
+
+echo "AGENT: $AGENT"
+echo "OPENHANDS_VERSION: $OPENHANDS_VERSION"
+echo "MODEL_CONFIG: $MODEL_CONFIG"
+
+EVAL_NOTE=$OPENHANDS_VERSION
+
+# Default to NOT use unit tests.
+if [ -z "$USE_UNIT_TESTS" ]; then
+  export USE_UNIT_TESTS=false
+fi
+echo "USE_UNIT_TESTS: $USE_UNIT_TESTS"
+# If use unit tests, set EVAL_NOTE to the commit hash
+if [ "$USE_UNIT_TESTS" = true ]; then
+  EVAL_NOTE=$EVAL_NOTE-w-test
 fi
 
-# Run the evaluation
-python3 run_infer.py \
-    --agent-cls "$AGENT_CLS" \
-    --eval-note "$EVAL_NOTE" \
-    --eval-output-dir "$EVAL_OUTPUT_DIR" \
-    --eval-num-workers "$EVAL_NUM_WORKERS" \
-    --eval-n-limit "$EVAL_N_LIMIT" \
-    --llm-config "$LLM_CONFIG" \
-    ${EVAL_IDS:+--eval-ids "$EVAL_IDS"} \
-    ${MAX_ITERATIONS:-}
+COMMAND="export PYTHONPATH=evaluation/benchmarks/polyglot_aider_bench:\$PYTHONPATH && poetry run python evaluation/benchmarks/polyglot_aider_bench/run_infer.py \
+  --agent-cls $AGENT \
+  --llm-config $MODEL_CONFIG \
+  --max-iterations 30 \
+  --eval-num-workers $NUM_WORKERS \
+  --eval-note $EVAL_NOTE"
+
+if [ -n "$EVAL_LIMIT" ]; then
+  echo "EVAL_LIMIT: $EVAL_LIMIT"
+  COMMAND="$COMMAND --eval-n-limit $EVAL_LIMIT"
+fi
+
+if [ -n "$EVAL_IDS" ]; then
+  echo "EVAL_IDS: $EVAL_IDS"
+  COMMAND="$COMMAND --eval-ids $EVAL_IDS"
+fi
+
+# Run the command
+eval $COMMAND
