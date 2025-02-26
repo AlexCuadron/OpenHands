@@ -64,6 +64,11 @@ while [[ $# -gt 0 ]]; do
       RUN_EVALUATION=true
       shift
       ;;
+    eval)
+      # Special case for the 'eval' parameter in the positional arguments
+      RUN_EVALUATION=true
+      shift
+      ;;
     *)
       POSITIONAL_ARGS+=("$1")
       shift
@@ -166,7 +171,8 @@ if [ "${EVAL_LIMIT}" != "-1" ]; then
   ARGS="${ARGS} --eval-n-limit ${EVAL_LIMIT}"
 fi
 
-if [ -n "${EVAL_IDS}" ]; then
+# Only pass eval-ids if it's not "eval" (which is a special parameter for evaluation mode)
+if [ -n "${EVAL_IDS}" ] && [ "${EVAL_IDS}" != "eval" ]; then
   ARGS="${ARGS} --eval-ids ${EVAL_IDS}"
 fi
 

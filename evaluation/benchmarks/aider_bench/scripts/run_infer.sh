@@ -11,6 +11,20 @@ NUM_WORKERS=$5
 EVAL_IDS=$6
 RUN_EVALUATION=$7  # New parameter to run evaluation after benchmark
 
+# Special case: if the 7th parameter is "eval", set RUN_EVALUATION to "eval"
+if [ "$RUN_EVALUATION" = "eval" ]; then
+  echo "Evaluation mode enabled"
+fi
+
+# Special case: if any parameter is "eval", set RUN_EVALUATION to "eval"
+for param in "$@"; do
+  if [ "$param" = "eval" ]; then
+    RUN_EVALUATION="eval"
+    echo "Evaluation mode enabled"
+    break
+  fi
+done
+
 if [ -z "$NUM_WORKERS" ]; then
   NUM_WORKERS=1
   echo "Number of workers not specified, use default $NUM_WORKERS"
@@ -52,7 +66,8 @@ if [ -n "$EVAL_LIMIT" ]; then
   COMMAND="$COMMAND --eval-n-limit $EVAL_LIMIT"
 fi
 
-if [ -n "$EVAL_IDS" ]; then
+# Only pass eval-ids if it's not "eval" (which is a special parameter for evaluation mode)
+if [ -n "$EVAL_IDS" ] && [ "$EVAL_IDS" != "eval" ]; then
   echo "EVAL_IDS: $EVAL_IDS"
   COMMAND="$COMMAND --eval-ids $EVAL_IDS"
 fi
