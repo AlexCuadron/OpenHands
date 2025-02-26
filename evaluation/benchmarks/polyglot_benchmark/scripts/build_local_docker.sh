@@ -30,6 +30,8 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     python3-venv \
     wget \
+    unzip \
+    zip \
     software-properties-common \
     apt-transport-https \
     ca-certificates \
@@ -63,11 +65,8 @@ RUN apt-get update && apt-get install -y openjdk-17-jdk \
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 
 # Install Gradle
-RUN wget https://services.gradle.org/distributions/gradle-7.6-bin.zip \
-    && mkdir /opt/gradle \
-    && unzip -d /opt/gradle gradle-7.6-bin.zip \
-    && rm gradle-7.6-bin.zip
-ENV PATH="/opt/gradle/gradle-7.6/bin:${PATH}"
+RUN apt-get update && apt-get install -y gradle \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create workspace directory
 RUN mkdir -p /workspace
