@@ -13,6 +13,8 @@ EVAL_LANGUAGES=${7:-""}
 
 # Set environment variables
 export USE_UNIT_TESTS=${USE_UNIT_TESTS:-"true"}
+export NO_DOCKER=${NO_DOCKER:-"false"}
+export POLYGLOT_DOCKER_IMAGE=${POLYGLOT_DOCKER_IMAGE:-"ghcr.io/opendevin/eval-polyglot:v1.0.0"}
 
 # Try to find the polyglot-benchmark repository
 if [ -z "$POLYGLOT_BENCHMARK_PATH" ]; then
