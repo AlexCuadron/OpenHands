@@ -53,6 +53,37 @@ export POLYGLOT_BENCHMARK_PATH="/path/to/polyglot-benchmark"  # Path to the poly
 export USE_UNIT_TESTS="true"  # Whether to run unit tests (default: true)
 export NO_DOCKER="true"  # Skip Docker container creation and use local runtime (default: false)
 export POLYGLOT_DOCKER_IMAGE="image:tag"  # Custom Docker image to use (default: ghcr.io/opendevin/eval-polyglot:v1.0.0)
+export BUILD_LOCAL_DOCKER="true"  # Build a local Docker image if one doesn't exist (default: false)
+```
+
+### Docker Support
+
+The benchmark uses Docker to create isolated environments for running code in different programming languages. There are two ways to use Docker with this benchmark:
+
+#### Option 1: Build a Local Docker Image
+
+You can build a local Docker image that contains all the necessary tools for the benchmark:
+
+```bash
+# Build the Docker image
+./evaluation/benchmarks/polyglot_benchmark/scripts/build_local_docker.sh
+
+# Run the benchmark with the local image
+./evaluation/benchmarks/polyglot_benchmark/scripts/run_infer.sh eval_gpt4_1106_preview HEAD CodeActAgent 1 1
+```
+
+Alternatively, you can set the `BUILD_LOCAL_DOCKER` environment variable:
+
+```bash
+BUILD_LOCAL_DOCKER=true ./evaluation/benchmarks/polyglot_benchmark/scripts/run_infer.sh eval_gpt4_1106_preview HEAD CodeActAgent 1 1
+```
+
+#### Option 2: Use a Pre-built Docker Image
+
+You can specify a custom Docker image to use:
+
+```bash
+POLYGLOT_DOCKER_IMAGE="your-custom-image:tag" ./evaluation/benchmarks/polyglot_benchmark/scripts/run_infer.sh eval_gpt4_1106_preview HEAD CodeActAgent 1 1
 ```
 
 ### Troubleshooting
@@ -67,18 +98,20 @@ Command 'docker buildx build ...' returned non-zero exit status 1
 
 You can try the following solutions:
 
-1. Run with `NO_DOCKER=true` to use the local runtime instead:
+1. Build a local Docker image as described above.
+
+2. Run with `NO_DOCKER=true` to use the local runtime instead:
    ```bash
    NO_DOCKER=true ./evaluation/benchmarks/polyglot_benchmark/scripts/run_infer.sh eval_gpt4_1106_preview HEAD CodeActAgent 1 1
    ```
 
-2. Make sure Docker is installed and running:
+3. Make sure Docker is installed and running:
    ```bash
    docker --version
    docker ps
    ```
 
-3. Check if you have permission to use Docker:
+4. Check if you have permission to use Docker:
    ```bash
    sudo usermod -aG docker $USER
    # Then log out and log back in

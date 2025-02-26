@@ -14,7 +14,28 @@ EVAL_LANGUAGES=${7:-""}
 # Set environment variables
 export USE_UNIT_TESTS=${USE_UNIT_TESTS:-"true"}
 export NO_DOCKER=${NO_DOCKER:-"false"}
-export POLYGLOT_DOCKER_IMAGE=${POLYGLOT_DOCKER_IMAGE:-"ghcr.io/opendevin/eval-polyglot:v1.0.0"}
+
+# Check if we have a local Docker image env file
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+BENCHMARK_DIR="$( cd "${SCRIPT_DIR}/.." && pwd )"
+DOCKER_ENV_FILE="${BENCHMARK_DIR}/docker_image.env"
+
+if [ -f "$DOCKER_ENV_FILE" ]; then
+  echo "Loading Docker image configuration from $DOCKER_ENV_FILE"
+  source "$DOCKER_ENV_FILE"
+else
+  # If no local image is available, use the default
+  export POLYGLOT_DOCKER_IMAGE=${POLYGLOT_DOCKER_IMAGE:-"ghcr.io/opendevin/eval-polyglot:v1.0.0"}
+  
+  # Check if we need to build a local Docker image
+  if [ "$BUILD_LOCAL_DOCKER" = "true" ]; then
+    echo "Building local Docker image..."
+    "${SCRIPT_DIR}/build_local_docker.sh"
+    source "$DOCKER_ENV_FILE"
+  fi
+fi
+
+echo "Using Docker image: $POLYGLOT_DOCKER_IMAGE"
 
 # Try to find the polyglot-benchmark repository
 if [ -z "$POLYGLOT_BENCHMARK_PATH" ]; then
