@@ -38,7 +38,11 @@ This benchmark is based on the [Aider Polyglot Benchmark](https://github.com/Aid
 
 2. To test one instance per language (quick verification):
    ```bash
+   # Without evaluation
    ./evaluation/benchmarks/polyglot_benchmark/scripts/run_infer.sh --one-per-language --model eval_gpt35_turbo
+   
+   # With automatic evaluation
+   ./evaluation/benchmarks/polyglot_benchmark/scripts/run_infer.sh --one-per-language --model eval_gpt35_turbo --eval
    ```
    
    This will run one test for each supported language (Python, Rust, Go, JavaScript, C++, and Java) and provide a summary of results.
@@ -47,6 +51,9 @@ This benchmark is based on the [Aider Polyglot Benchmark](https://github.com/Aid
    ```bash
    # Using named arguments (recommended)
    ./evaluation/benchmarks/polyglot_benchmark/scripts/run_infer.sh --model eval_gpt35_turbo --agent CodeActAgent --limit 10 --workers 4 --languages python,javascript
+   
+   # With automatic evaluation
+   ./evaluation/benchmarks/polyglot_benchmark/scripts/run_infer.sh --model eval_gpt35_turbo --agent CodeActAgent --limit 10 --workers 4 --languages python,javascript --eval
    
    # Or using positional arguments (legacy)
    ./evaluation/benchmarks/polyglot_benchmark/scripts/run_infer.sh <model_config> <git-version> <agent> <eval_limit> <eval-num-workers> <eval_ids> <eval_languages>
@@ -62,6 +69,7 @@ This benchmark is based on the [Aider Polyglot Benchmark](https://github.com/Aid
    --ids IDS              Comma-separated list of instance IDs
    --languages LANGUAGES  Comma-separated list of languages
    --one-per-language     Test one instance per language
+   --eval                 Run evaluation after benchmark completes
    ```
 
 ### Command Line Arguments

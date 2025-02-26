@@ -16,7 +16,7 @@ development environment and LLM.
 ## Start the evaluation
 
 ```bash
-./evaluation/benchmarks/aider_bench/scripts/run_infer.sh [model_config] [git-version] [agent] [eval_limit] [eval-num-workers] [eval_ids]
+./evaluation/benchmarks/aider_bench/scripts/run_infer.sh [model_config] [git-version] [agent] [eval_limit] [eval-num-workers] [eval_ids] [run_evaluation]
 ```
 
 - `model_config`, e.g. `eval_gpt4_1106_preview`, is the config group name for
@@ -31,6 +31,7 @@ development environment and LLM.
 - `eval-num-workers`: the number of workers to use for evaluation. Default: `1`.
 - `eval_ids`, e.g. `"1,3,10"`, limits the evaluation to instances with the
     given IDs (comma separated).
+- `run_evaluation`: set to `eval` to automatically run evaluation after the benchmark completes.
 
 There are also following optional environment variables you can set:
 
@@ -53,7 +54,11 @@ You can update the arguments in the script
 - `--eval-ids`: the IDs of the examples to evaluate (comma separated). For example, `"1,3,10"`.
 
 ```bash
+# Run benchmark without evaluation
 ./evaluation/benchmarks/aider_bench/scripts/run_infer.sh eval_gpt35_turbo HEAD CodeActAgent 100 1 "1,3,10"
+
+# Run benchmark with automatic evaluation
+./evaluation/benchmarks/aider_bench/scripts/run_infer.sh eval_gpt35_turbo HEAD CodeActAgent 100 1 "1,3,10" eval
 ```
 
 ### Run Inference on `RemoteRuntime` (experimental)
