@@ -102,8 +102,6 @@ def get_config(
         metadata.eval_output_dir,
         str(instance.instance_id)
     )
-    # Enable logging of LLM completions
-    llm_config.log_completions = True
     config.set_llm_config(llm_config)
 
     agent_config = config.get_agent_config(metadata.agent_class)
@@ -498,8 +496,6 @@ if __name__ == '__main__':
         llm_config = get_llm_config_arg(args.llm_config)
         # modify_params must be False for evaluation purpose, for reproducibility and accuracy of results
         llm_config.modify_params = False
-        # Enable logging of LLM completions
-        llm_config.log_completions = True
 
     if llm_config is None:
         raise ValueError(f'Could not find LLM config: --llm_config {args.llm_config}')
