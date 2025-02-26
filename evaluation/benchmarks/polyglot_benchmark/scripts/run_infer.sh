@@ -2,14 +2,80 @@
 
 set -e
 
-# Default values
-MODEL_CONFIG=${1:-"eval_gpt4_1106_preview"}
+# Display usage information
+function show_usage {
+  echo "Usage: $0 [options]"
+  echo ""
+  echo "Options:"
+  echo "  --help                 Show this help message"
+  echo "  --model MODEL          Model configuration (default: eval_gpt4_1106_preview)"
+  echo "  --agent AGENT          Agent class (default: CodeActAgent)"
+  echo "  --limit LIMIT          Evaluation limit (default: -1 for all)"
+  echo "  --workers WORKERS      Number of workers (default: 1)"
+  echo "  --ids IDS              Comma-separated list of instance IDs"
+  echo "  --languages LANGUAGES  Comma-separated list of languages"
+  echo "  --one-per-language     Test one instance per language"
+  echo ""
+  echo "Legacy positional arguments are still supported:"
+  echo "  $0 MODEL_CONFIG GIT_VERSION AGENT EVAL_LIMIT EVAL_NUM_WORKERS EVAL_IDS EVAL_LANGUAGES"
+  exit 0
+}
+
+# Parse named arguments
+ONE_PER_LANGUAGE=false
+POSITIONAL_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --help)
+      show_usage
+      ;;
+    --model)
+      MODEL_CONFIG="$2"
+      shift 2
+      ;;
+    --agent)
+      AGENT="$2"
+      shift 2
+      ;;
+    --limit)
+      EVAL_LIMIT="$2"
+      shift 2
+      ;;
+    --workers)
+      EVAL_NUM_WORKERS="$2"
+      shift 2
+      ;;
+    --ids)
+      EVAL_IDS="$2"
+      shift 2
+      ;;
+    --languages)
+      EVAL_LANGUAGES="$2"
+      shift 2
+      ;;
+    --one-per-language)
+      ONE_PER_LANGUAGE=true
+      shift
+      ;;
+    *)
+      POSITIONAL_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+# Restore positional parameters
+set -- "${POSITIONAL_ARGS[@]}"
+
+# Default values (if not set by named arguments)
+MODEL_CONFIG=${MODEL_CONFIG:-${1:-"eval_gpt4_1106_preview"}}
 GIT_VERSION=${2:-"HEAD"}
-AGENT=${3:-"CodeActAgent"}
-EVAL_LIMIT=${4:-"-1"}
-EVAL_NUM_WORKERS=${5:-"1"}
-EVAL_IDS=${6:-""}
-EVAL_LANGUAGES=${7:-""}
+AGENT=${AGENT:-${3:-"CodeActAgent"}}
+EVAL_LIMIT=${EVAL_LIMIT:-${4:-"-1"}}
+EVAL_NUM_WORKERS=${EVAL_NUM_WORKERS:-${5:-"1"}}
+EVAL_IDS=${EVAL_IDS:-${6:-""}}
+EVAL_LANGUAGES=${EVAL_LANGUAGES:-${7:-""}}
 
 # Set environment variables
 export USE_UNIT_TESTS=${USE_UNIT_TESTS:-"true"}
@@ -102,6 +168,57 @@ if [ -n "${EVAL_LANGUAGES}" ]; then
   ARGS="${ARGS} --eval-languages ${EVAL_LANGUAGES}"
 fi
 
-# Run the evaluation
+# Change to the repository root directory
 cd "$(git rev-parse --show-toplevel)"
-poetry run python -m evaluation.benchmarks.polyglot_benchmark.run_infer ${ARGS}
+
+# If one-per-language mode is enabled
+if [ "$ONE_PER_LANGUAGE" = true ]; then
+  echo "Running one instance per language mode..."
+  
+  # Define the languages to test
+  LANGUAGES=("python" "javascript" "rust" "go" "cpp" "java")
+  
+  # Create a temporary directory for results
+  RESULTS_DIR="evaluation/evaluation_outputs/one_per_language_test"
+  mkdir -p "$RESULTS_DIR"
+  
+  # Summary file
+  SUMMARY_FILE="$RESULTS_DIR/summary.txt"
+  echo "POLYGLOT BENCHMARK - ONE INSTANCE PER LANGUAGE TEST" > "$SUMMARY_FILE"
+  echo "=================================================" >> "$SUMMARY_FILE"
+  echo "Model: $MODEL_CONFIG" >> "$SUMMARY_FILE"
+  echo "Agent: $AGENT" >> "$SUMMARY_FILE"
+  echo "Date: $(date)" >> "$SUMMARY_FILE"
+  echo "=================================================" >> "$SUMMARY_FILE"
+  echo "" >> "$SUMMARY_FILE"
+  
+  # Test each language
+  for LANG in "${LANGUAGES[@]}"; do
+    echo ""
+    echo "===== Testing language: $LANG ====="
+    echo ""
+    
+    # Run with one instance for this language
+    LANG_ARGS="--agent-cls ${AGENT} --llm-config ${MODEL_CONFIG} --max-iterations 30 --eval-num-workers 1 --eval-n-limit 1 --eval-languages ${LANG} --eval-note one_per_language_${LANG}"
+    
+    # Run the evaluation for this language
+    if poetry run python -m evaluation.benchmarks.polyglot_benchmark.run_infer ${LANG_ARGS}; then
+      RESULT="PASSED"
+    else
+      RESULT="FAILED"
+    fi
+    
+    # Add to summary
+    echo "${LANG}: ${RESULT}" >> "$SUMMARY_FILE"
+  done
+  
+  # Display summary
+  echo ""
+  echo "===== TEST SUMMARY ====="
+  cat "$SUMMARY_FILE"
+  echo ""
+  echo "Detailed results available in: $RESULTS_DIR"
+else
+  # Run the normal evaluation
+  poetry run python -m evaluation.benchmarks.polyglot_benchmark.run_infer ${ARGS}
+fi
