@@ -8,6 +8,11 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+# NOTE: This benchmark has been modified to use only the same tools as SWE-Bench:
+# - execute_bash
+# - finish
+# - str_replace_editor
+
 import pandas as pd
 
 from evaluation.benchmarks.polyglot_benchmark.helper.prompts import (
@@ -103,6 +108,11 @@ def get_config(
 
     agent_config = config.get_agent_config(metadata.agent_class)
     agent_config.enable_prompt_extensions = False
+    
+    # Restrict tools to match SWE-Bench (only execute_bash, finish, and str_replace_editor)
+    agent_config.codeact_enable_jupyter = False
+    agent_config.codeact_enable_browsing = False
+    agent_config.codeact_enable_llm_editor = False
 
     # copy 'draft_editor' config if exists
     config_copy = copy.deepcopy(config)
