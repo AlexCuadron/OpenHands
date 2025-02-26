@@ -198,28 +198,40 @@ def complete_runtime(
                 
         if command:
             try:
-                result = subprocess.run(
-                    command,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    timeout=180,  # 3 minutes timeout
-                    cwd="/workspace",
-                    encoding="utf-8",
-                    errors="replace",
-                )
-                exit_code = result.returncode
-                test_output = result.stdout
+                # Use the runtime to run the command inside the Docker container
+                cmd_str = " ".join(command)
+                logger.info(f"Running test command: {cmd_str}")
+                
+                action = CmdRunAction(command=cmd_str)
+                logger.info(action, extra={'msg_type': 'ACTION'})
+                
+                obs = runtime.run_action(action)
+                logger.info(obs, extra={'msg_type': 'OBSERVATION'})
+                
+                if isinstance(obs, CmdOutputObservation):
+                    exit_code = obs.exit_code
+                    test_output = obs.content
+                else:
+                    logger.error(f"Unexpected observation type: {type(obs)}")
+                    exit_code = 1
+                    test_output = f"Error: Unexpected observation type: {type(obs)}"
                 
                 # Clean up output
                 test_output = test_output.replace("/workspace", "workspace")
                 
                 # Log test output to history file
-                with open("/workspace/.aider.chat.history.md", "a") as fh:
-                    fh.write(f"```\n{test_output}\n```")
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    history_path = os.path.join(tmpdir, ".aider.chat.history.md")
+                    with open(history_path, 'w') as f:
+                        f.write(f"```\n{test_output}\n```")
+                    runtime.copy_to(
+                        history_path,
+                        '/workspace',
+                    )
                     
-            except subprocess.TimeoutExpired:
-                test_output = "Tests timed out!"
+            except Exception as e:
+                logger.error(f"Error running tests: {e}")
+                test_output = f"Tests failed with error: {e}"
                 exit_code = 1
 
     logger.info('-' * 30)
