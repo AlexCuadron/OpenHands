@@ -504,6 +504,15 @@ if __name__ == '__main__':
     if llm_config is None:
         raise ValueError(f'Could not find LLM config: --llm_config {args.llm_config}')
 
+    # Create details dictionary with agent configuration
+    agent_details = {
+        "agent_config": {
+            "codeact_enable_jupyter": False,
+            "codeact_enable_browsing": False,
+            "codeact_enable_llm_editor": False,
+        }
+    }
+    
     metadata = make_metadata(
         llm_config,
         'PolyglotBenchmark',
@@ -511,6 +520,7 @@ if __name__ == '__main__':
         args.max_iterations,
         args.eval_note,
         args.eval_output_dir,
+        details=agent_details,
     )
     output_file = os.path.join(metadata.eval_output_dir, 'output.jsonl')
 

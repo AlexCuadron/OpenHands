@@ -158,6 +158,35 @@ def cleanup():
         process.join()
 
 
+def get_tools_string(agent_class: str, details: dict[str, Any] | None = None) -> str:
+    """Generate a string representation of the tools used by the agent.
+    
+    Args:
+        agent_class: The agent class name.
+        details: Additional details that might contain tool configuration.
+        
+    Returns:
+        A string representation of the tools used, e.g., "bash+finish+str_replace".
+    """
+    # Default tools for CodeActAgent
+    if agent_class == "CodeActAgent":
+        tools = ["bash", "finish", "str_replace"]
+        
+        # Check if additional tools are enabled
+        if details and "agent_config" in details:
+            agent_config = details.get("agent_config", {})
+            if agent_config.get("codeact_enable_browsing", False):
+                tools.extend(["web_read", "browser"])
+            if agent_config.get("codeact_enable_jupyter", False):
+                tools.append("ipython")
+            if agent_config.get("codeact_enable_llm_editor", False):
+                tools[-1] = "llm_editor"  # Replace str_replace with llm_editor
+        
+        return "+".join(tools)
+    
+    # For other agents, return a default string
+    return "default_tools"
+
 def make_metadata(
     llm_config: LLMConfig,
     dataset_name: str,
@@ -172,12 +201,15 @@ def make_metadata(
     model_name = llm_config.model.split('/')[-1]
     model_path = model_name.replace(':', '_').replace('@', '-')
     eval_note = f'_N_{eval_note}' if eval_note else ''
-
+    
+    # Get tools string
+    tools_string = get_tools_string(agent_class, details)
+    
     eval_output_path = os.path.join(
         eval_output_dir,
         dataset_name,
         agent_class,
-        f'{model_path}_maxiter_{max_iterations}{eval_note}',
+        f'{model_path}_maxiter_{max_iterations}_tools_{tools_string}{eval_note}',
     )
 
     pathlib.Path(eval_output_path).mkdir(parents=True, exist_ok=True)

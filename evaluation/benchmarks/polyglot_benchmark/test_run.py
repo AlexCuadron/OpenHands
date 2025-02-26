@@ -50,6 +50,15 @@ def main():
         print(f"Could not find LLM config: {args.model}")
         return
         
+    # Create details dictionary with agent configuration
+    agent_details = {
+        "agent_config": {
+            "codeact_enable_jupyter": False,
+            "codeact_enable_browsing": False,
+            "codeact_enable_llm_editor": False,
+        }
+    }
+    
     # Create metadata
     metadata = make_metadata(
         llm_config,
@@ -58,6 +67,7 @@ def main():
         30,  # max_iterations
         "test",
         "evaluation/evaluation_outputs/test",
+        details=agent_details,
     )
     
     # Process the instance
