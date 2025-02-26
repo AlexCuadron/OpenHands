@@ -424,10 +424,13 @@ def add_arguments(parser):
     return parser
 
 if __name__ == '__main__':
-    # Add custom arguments
-    parser = parse_arguments.__self__
+    # Get the argument parser and add custom arguments
+    import argparse
+    from openhands.core.config import get_parser
+    
+    parser = get_parser()
     add_arguments(parser)
-    args = parser.parse_args()
+    args = parse_arguments()
     
     # Load the polyglot benchmark dataset
     polyglot_tests = load_polyglot_dataset()
