@@ -236,13 +236,23 @@ if [ "$ONE_PER_LANGUAGE" = true ]; then
     # Evaluate each language's results
     for LANG in "${LANGUAGES[@]}"; do
       # Try to find the output directory for this language
-      LANG_OUTPUT_DIR=$(find . -path "*/evaluation_outputs/*" -type d -name "*one_per_language_${LANG}*" 2>/dev/null | sort -r | head -n 1)
+      LANG_OUTPUT_DIR=$(find evaluation/evaluation_outputs -type d -name "*one_per_language_${LANG}*" 2>/dev/null | sort -r | head -n 1)
+      
+      if [ -z "$LANG_OUTPUT_DIR" ]; then
+        LANG_OUTPUT_DIR=$(find . -path "*/evaluation_outputs/*" -type d -name "*one_per_language_${LANG}*" 2>/dev/null | sort -r | head -n 1)
+      fi
       
       if [ -z "$LANG_OUTPUT_DIR" ]; then
         LANG_OUTPUT_DIR="evaluation/evaluation_outputs/one_per_language_${LANG}"
       fi
       
       LANG_OUTPUT_FILE="${LANG_OUTPUT_DIR}/output.jsonl"
+      
+      # Print the language output directory and file for debugging
+      echo ""
+      echo "Language: $LANG"
+      echo "Output directory: $LANG_OUTPUT_DIR"
+      echo "Output file: $LANG_OUTPUT_FILE"
       
       if [ -f "$LANG_OUTPUT_FILE" ]; then
         echo ""
@@ -273,11 +283,11 @@ else
     echo ""
     
     # Get the output directory - first try the default location
-    OUTPUT_DIR=$(find evaluation/evaluation_outputs/PolyglotBenchmark/$AGENT -type d -name "*tools_bash+finish+str_replace*" 2>/dev/null | sort -r | head -n 1)
+    OUTPUT_DIR=$(find evaluation/evaluation_outputs -path "*/PolyglotBenchmark/$AGENT/*" -type d -name "*tools_bash+finish+str_replace*" 2>/dev/null | sort -r | head -n 1)
     
     # If not found, try to find it anywhere under evaluation_outputs
     if [ -z "$OUTPUT_DIR" ]; then
-      OUTPUT_DIR=$(find . -path "*/evaluation_outputs/*" -type d -name "*tools_bash+finish+str_replace*" 2>/dev/null | sort -r | head -n 1)
+      OUTPUT_DIR=$(find . -path "*/evaluation_outputs/*" -path "*/PolyglotBenchmark/$AGENT/*" -type d -name "*tools_bash+finish+str_replace*" 2>/dev/null | sort -r | head -n 1)
     fi
     
     # If still not found, try to find any output.jsonl file
@@ -289,6 +299,11 @@ else
     else
       OUTPUT_FILE="$OUTPUT_DIR/output.jsonl"
     fi
+    
+    # Print the output directory and file for debugging
+    echo ""
+    echo "Output directory: $OUTPUT_DIR"
+    echo "Output file: $OUTPUT_FILE"
     
     if [ -f "$OUTPUT_FILE" ]; then
       echo "Evaluating results in: $OUTPUT_FILE"

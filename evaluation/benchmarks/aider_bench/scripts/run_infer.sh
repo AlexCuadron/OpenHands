@@ -61,11 +61,11 @@ fi
 eval $COMMAND
 
 # Get the output directory - first try the default location
-OUTPUT_DIR=$(find evaluation/evaluation_outputs/AiderBench/$AGENT -type d -name "*$EVAL_NOTE*" 2>/dev/null | sort -r | head -n 1)
+OUTPUT_DIR=$(find evaluation/evaluation_outputs -path "*/AiderBench/$AGENT/*" -type d -name "*$EVAL_NOTE*" 2>/dev/null | sort -r | head -n 1)
 
 # If not found, try to find it anywhere under evaluation_outputs
 if [ -z "$OUTPUT_DIR" ]; then
-  OUTPUT_DIR=$(find . -path "*/evaluation_outputs/*" -type d -name "*$EVAL_NOTE*" 2>/dev/null | sort -r | head -n 1)
+  OUTPUT_DIR=$(find . -path "*/evaluation_outputs/*" -path "*/AiderBench/$AGENT/*" -type d -name "*$EVAL_NOTE*" 2>/dev/null | sort -r | head -n 1)
 fi
 
 # If still not found, try to find any output.jsonl file
@@ -77,6 +77,11 @@ if [ -z "$OUTPUT_DIR" ]; then
 else
   OUTPUT_FILE="$OUTPUT_DIR/output.jsonl"
 fi
+
+# Print the output directory and file for debugging
+echo ""
+echo "Output directory: $OUTPUT_DIR"
+echo "Output file: $OUTPUT_FILE"
 
 # Run evaluation if requested
 if [ "$RUN_EVALUATION" = "eval" ]; then
