@@ -328,9 +328,31 @@ def load_polyglot_dataset():
     import glob
     import json
     import os
+    from pathlib import Path
     
-    # Path to the polyglot-benchmark repository
-    repo_path = os.environ.get('POLYGLOT_BENCHMARK_PATH', '/workspace/polyglot-benchmark')
+    # Try to find the polyglot-benchmark repository
+    # First check the environment variable
+    repo_path = os.environ.get('POLYGLOT_BENCHMARK_PATH')
+    
+    # If not set, try common locations
+    if not repo_path or not os.path.exists(repo_path):
+        possible_paths = [
+            '/workspace/polyglot-benchmark',
+            str(Path.home() / 'polyglot-benchmark'),
+            str(Path.home() / 'thereal' / 'polyglot-benchmark'),
+            str(Path(__file__).parent.parent.parent.parent.parent / 'polyglot-benchmark'),
+            str(Path.cwd() / 'polyglot-benchmark'),
+        ]
+        
+        for path in possible_paths:
+            if os.path.exists(path):
+                repo_path = path
+                logger.info(f"Found polyglot-benchmark repository at: {repo_path}")
+                break
+    
+    if not repo_path or not os.path.exists(repo_path):
+        logger.error("Could not find polyglot-benchmark repository. Please set POLYGLOT_BENCHMARK_PATH environment variable.")
+        return pd.DataFrame()
     
     all_tests = []
     instance_id = 0
