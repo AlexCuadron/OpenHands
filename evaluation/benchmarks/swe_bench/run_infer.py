@@ -540,7 +540,14 @@ if __name__ == '__main__':
     if llm_config is None:
         raise ValueError(f'Could not find LLM config: --llm_config {args.llm_config}')
 
-    details = {}
+    # Create details dictionary with agent configuration
+    details = {
+        "agent_config": {
+            "codeact_enable_jupyter": False,
+            "codeact_enable_browsing": RUN_WITH_BROWSING,
+            "codeact_enable_llm_editor": False,
+        }
+    }
     _agent_cls = openhands.agenthub.Agent.get_cls(args.agent_cls)
 
     dataset_descrption = (
