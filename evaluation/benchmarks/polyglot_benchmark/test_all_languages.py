@@ -44,6 +44,15 @@ def test_language(language, model, agent):
         print(f"Could not find LLM config: {model}")
         return False
     
+    # Create details dictionary with agent configuration
+    agent_details = {
+        "agent_config": {
+            "codeact_enable_jupyter": False,
+            "codeact_enable_browsing": False,
+            "codeact_enable_llm_editor": False,
+        }
+    }
+    
     # Create metadata
     metadata = make_metadata(
         llm_config,
@@ -52,6 +61,7 @@ def test_language(language, model, agent):
         30,  # max_iterations
         f"test_{language}",
         f"evaluation/evaluation_outputs/test_{language}",
+        details=agent_details,
     )
     
     # Process the instance
