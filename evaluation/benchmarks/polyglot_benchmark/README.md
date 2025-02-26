@@ -53,16 +53,29 @@ export POLYGLOT_BENCHMARK_PATH="/path/to/polyglot-benchmark"  # Path to the poly
 export USE_UNIT_TESTS="true"  # Whether to run unit tests (default: true)
 export NO_DOCKER="true"  # Skip Docker container creation and use local runtime (default: false)
 export POLYGLOT_DOCKER_IMAGE="image:tag"  # Custom Docker image to use (default: ghcr.io/opendevin/eval-polyglot:v1.0.0)
-export BUILD_LOCAL_DOCKER="true"  # Build a local Docker image if one doesn't exist (default: false)
+export BUILD_LOCAL_DOCKER="false"  # Build a local Docker image if one doesn't exist (default: true)
 ```
 
 ### Docker Support
 
-The benchmark uses Docker to create isolated environments for running code in different programming languages. There are two ways to use Docker with this benchmark:
+The benchmark uses Docker to create isolated environments for running code in different programming languages. By default, the script will:
 
-#### Option 1: Build a Local Docker Image
+1. Try to pull the specified Docker image from the registry
+2. If the pull fails, automatically build a local Docker image
 
-You can build a local Docker image that contains all the necessary tools for the benchmark:
+You have several options for customizing this behavior:
+
+#### Option 1: Use the Default Behavior (Recommended)
+
+Simply run the benchmark script, and it will handle the Docker image automatically:
+
+```bash
+./evaluation/benchmarks/polyglot_benchmark/scripts/run_infer.sh eval_gpt4_1106_preview HEAD CodeActAgent 1 1
+```
+
+#### Option 2: Manually Build a Local Docker Image
+
+You can explicitly build a local Docker image before running the benchmark:
 
 ```bash
 # Build the Docker image
@@ -72,13 +85,15 @@ You can build a local Docker image that contains all the necessary tools for the
 ./evaluation/benchmarks/polyglot_benchmark/scripts/run_infer.sh eval_gpt4_1106_preview HEAD CodeActAgent 1 1
 ```
 
-Alternatively, you can set the `BUILD_LOCAL_DOCKER` environment variable:
+#### Option 3: Disable Automatic Docker Image Building
+
+If you want to disable the automatic building of a Docker image:
 
 ```bash
-BUILD_LOCAL_DOCKER=true ./evaluation/benchmarks/polyglot_benchmark/scripts/run_infer.sh eval_gpt4_1106_preview HEAD CodeActAgent 1 1
+BUILD_LOCAL_DOCKER=false ./evaluation/benchmarks/polyglot_benchmark/scripts/run_infer.sh eval_gpt4_1106_preview HEAD CodeActAgent 1 1
 ```
 
-#### Option 2: Use a Pre-built Docker Image
+#### Option 4: Use a Custom Docker Image
 
 You can specify a custom Docker image to use:
 

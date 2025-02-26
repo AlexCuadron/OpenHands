@@ -20,6 +20,9 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BENCHMARK_DIR="$( cd "${SCRIPT_DIR}/.." && pwd )"
 DOCKER_ENV_FILE="${BENCHMARK_DIR}/docker_image.env"
 
+# Set BUILD_LOCAL_DOCKER to true by default if not specified
+export BUILD_LOCAL_DOCKER=${BUILD_LOCAL_DOCKER:-"true"}
+
 if [ -f "$DOCKER_ENV_FILE" ]; then
   echo "Loading Docker image configuration from $DOCKER_ENV_FILE"
   source "$DOCKER_ENV_FILE"
@@ -27,11 +30,24 @@ else
   # If no local image is available, use the default
   export POLYGLOT_DOCKER_IMAGE=${POLYGLOT_DOCKER_IMAGE:-"ghcr.io/opendevin/eval-polyglot:v1.0.0"}
   
-  # Check if we need to build a local Docker image
-  if [ "$BUILD_LOCAL_DOCKER" = "true" ]; then
-    echo "Building local Docker image..."
-    "${SCRIPT_DIR}/build_local_docker.sh"
-    source "$DOCKER_ENV_FILE"
+  # Try to pull the image first
+  echo "Trying to pull Docker image: $POLYGLOT_DOCKER_IMAGE"
+  if ! docker pull "$POLYGLOT_DOCKER_IMAGE" 2>/dev/null; then
+    echo "Failed to pull Docker image: $POLYGLOT_DOCKER_IMAGE"
+    
+    # Build a local Docker image if pulling fails and BUILD_LOCAL_DOCKER is true
+    if [ "$BUILD_LOCAL_DOCKER" = "true" ]; then
+      echo "Building local Docker image..."
+      "${SCRIPT_DIR}/build_local_docker.sh"
+      source "$DOCKER_ENV_FILE"
+    else
+      echo "WARNING: Docker image not found and BUILD_LOCAL_DOCKER is not set to true."
+      echo "You can build a local Docker image by running:"
+      echo "  ${SCRIPT_DIR}/build_local_docker.sh"
+      echo "Or set BUILD_LOCAL_DOCKER=true to build it automatically."
+    fi
+  else
+    echo "Successfully pulled Docker image: $POLYGLOT_DOCKER_IMAGE"
   fi
 fi
 
