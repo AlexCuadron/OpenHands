@@ -36,9 +36,32 @@ This benchmark is based on the [Aider Polyglot Benchmark](https://github.com/Aid
    pip install -e .[dev]
    ```
 
-2. Run the benchmark:
+2. To test one instance per language (quick verification):
    ```bash
+   ./evaluation/benchmarks/polyglot_benchmark/scripts/run_infer.sh --one-per-language --model eval_gpt35_turbo
+   ```
+   
+   This will run one test for each supported language (Python, Rust, Go, JavaScript, C++, and Java) and provide a summary of results.
+
+3. Run the full benchmark:
+   ```bash
+   # Using named arguments (recommended)
+   ./evaluation/benchmarks/polyglot_benchmark/scripts/run_infer.sh --model eval_gpt35_turbo --agent CodeActAgent --limit 10 --workers 4 --languages python,javascript
+   
+   # Or using positional arguments (legacy)
    ./evaluation/benchmarks/polyglot_benchmark/scripts/run_infer.sh <model_config> <git-version> <agent> <eval_limit> <eval-num-workers> <eval_ids> <eval_languages>
+   ```
+
+4. Available command-line options:
+   ```
+   --help                 Show help message
+   --model MODEL          Model configuration (default: eval_gpt4_1106_preview)
+   --agent AGENT          Agent class (default: CodeActAgent)
+   --limit LIMIT          Evaluation limit (default: -1 for all)
+   --workers WORKERS      Number of workers (default: 1)
+   --ids IDS              Comma-separated list of instance IDs
+   --languages LANGUAGES  Comma-separated list of languages
+   --one-per-language     Test one instance per language
    ```
 
 ### Command Line Arguments
