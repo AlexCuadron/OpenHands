@@ -2,6 +2,13 @@
 
 This benchmark is based on the [Aider Polyglot Benchmark](https://github.com/Aider-AI/polyglot-benchmark), which evaluates how effectively an agent can translate natural language coding requests into executable code that passes unit tests across multiple programming languages.
 
+> **Note**: This benchmark has been modified to use only the same tools as SWE-Bench:
+> - execute_bash
+> - finish
+> - str_replace_editor
+>
+> This restriction ensures consistent tool usage across benchmarks for more accurate comparisons.
+
 ## Features
 
 - Supports multiple programming languages (Python, JavaScript, Rust, Go, C++, Java)
