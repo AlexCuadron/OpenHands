@@ -15,6 +15,7 @@ function show_usage {
   echo "  --ids IDS              Comma-separated list of instance IDs"
   echo "  --languages LANGUAGES  Comma-separated list of languages"
   echo "  --one-per-language     Test one instance per language"
+  echo "  --eval                 Run evaluation after benchmark"
   echo ""
   echo "Legacy positional arguments are still supported:"
   echo "  $0 MODEL_CONFIG GIT_VERSION AGENT EVAL_LIMIT EVAL_NUM_WORKERS EVAL_IDS EVAL_LANGUAGES"
@@ -23,6 +24,7 @@ function show_usage {
 
 # Parse named arguments
 ONE_PER_LANGUAGE=false
+RUN_EVALUATION=false
 POSITIONAL_ARGS=()
 
 while [[ $# -gt 0 ]]; do
@@ -56,6 +58,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --one-per-language)
       ONE_PER_LANGUAGE=true
+      shift
+      ;;
+    --eval)
+      RUN_EVALUATION=true
       shift
       ;;
     *)
@@ -218,7 +224,66 @@ if [ "$ONE_PER_LANGUAGE" = true ]; then
   cat "$SUMMARY_FILE"
   echo ""
   echo "Detailed results available in: $RESULTS_DIR"
+  
+  # Run evaluation if requested
+  if [ "$RUN_EVALUATION" = true ]; then
+    echo ""
+    echo "======================================"
+    echo "Running detailed evaluation on results..."
+    echo "======================================"
+    echo ""
+    
+    # Evaluate each language's results
+    for LANG in "${LANGUAGES[@]}"; do
+      LANG_OUTPUT_DIR="evaluation/evaluation_outputs/one_per_language_${LANG}"
+      LANG_OUTPUT_FILE="${LANG_OUTPUT_DIR}/output.jsonl"
+      
+      if [ -f "$LANG_OUTPUT_FILE" ]; then
+        echo ""
+        echo "===== Evaluating $LANG results ====="
+        echo ""
+        echo "Evaluating results in: $LANG_OUTPUT_FILE"
+        
+        # Save the evaluation results
+        EVAL_RESULTS_FILE="${LANG_OUTPUT_DIR}/evaluation_results.txt"
+        echo "Saving evaluation results to: $EVAL_RESULTS_FILE"
+        poetry run python evaluation/benchmarks/polyglot_benchmark/scripts/summarize_results.py "$LANG_OUTPUT_FILE" > "$EVAL_RESULTS_FILE"
+      fi
+    done
+    
+    echo ""
+    echo "Detailed evaluation complete."
+  fi
 else
   # Run the normal evaluation
   poetry run python -m evaluation.benchmarks.polyglot_benchmark.run_infer ${ARGS}
+  
+  # Run evaluation if requested
+  if [ "$RUN_EVALUATION" = true ]; then
+    echo ""
+    echo "======================================"
+    echo "Running evaluation on results..."
+    echo "======================================"
+    echo ""
+    
+    # Get the output directory
+    OUTPUT_DIR=$(find evaluation/evaluation_outputs/PolyglotBenchmark/$AGENT -type d -name "*tools_bash+finish+str_replace*" | sort -r | head -n 1)
+    OUTPUT_FILE="$OUTPUT_DIR/output.jsonl"
+    
+    if [ -f "$OUTPUT_FILE" ]; then
+      echo "Evaluating results in: $OUTPUT_FILE"
+      poetry run python evaluation/benchmarks/polyglot_benchmark/scripts/summarize_results.py "$OUTPUT_FILE"
+      
+      # Save the evaluation results
+      EVAL_RESULTS_FILE="$OUTPUT_DIR/evaluation_results.txt"
+      echo "Saving evaluation results to: $EVAL_RESULTS_FILE"
+      poetry run python evaluation/benchmarks/polyglot_benchmark/scripts/summarize_results.py "$OUTPUT_FILE" > "$EVAL_RESULTS_FILE"
+      
+      echo ""
+      echo "Evaluation complete. Results saved to: $EVAL_RESULTS_FILE"
+    else
+      echo "Error: Output file not found: $OUTPUT_FILE"
+      echo "Cannot run evaluation."
+    fi
+  fi
 fi

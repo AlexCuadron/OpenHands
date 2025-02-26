@@ -9,6 +9,7 @@ AGENT=$3
 EVAL_LIMIT=$4
 NUM_WORKERS=$5
 EVAL_IDS=$6
+RUN_EVALUATION=$7  # New parameter to run evaluation after benchmark
 
 if [ -z "$NUM_WORKERS" ]; then
   NUM_WORKERS=1
@@ -58,3 +59,32 @@ fi
 
 # Run the command
 eval $COMMAND
+
+# Get the output directory
+OUTPUT_DIR=$(find evaluation/evaluation_outputs/AiderBench/$AGENT -type d -name "*$EVAL_NOTE*" | sort -r | head -n 1)
+OUTPUT_FILE="$OUTPUT_DIR/output.jsonl"
+
+# Run evaluation if requested
+if [ "$RUN_EVALUATION" = "eval" ]; then
+  echo ""
+  echo "======================================"
+  echo "Running evaluation on results..."
+  echo "======================================"
+  echo ""
+  
+  if [ -f "$OUTPUT_FILE" ]; then
+    echo "Evaluating results in: $OUTPUT_FILE"
+    poetry run python evaluation/benchmarks/aider_bench/scripts/summarize_results.py "$OUTPUT_FILE"
+    
+    # Save the evaluation results
+    EVAL_RESULTS_FILE="$OUTPUT_DIR/evaluation_results.txt"
+    echo "Saving evaluation results to: $EVAL_RESULTS_FILE"
+    poetry run python evaluation/benchmarks/aider_bench/scripts/summarize_results.py "$OUTPUT_FILE" > "$EVAL_RESULTS_FILE"
+    
+    echo ""
+    echo "Evaluation complete. Results saved to: $EVAL_RESULTS_FILE"
+  else
+    echo "Error: Output file not found: $OUTPUT_FILE"
+    echo "Cannot run evaluation."
+  fi
+fi
