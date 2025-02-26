@@ -51,7 +51,38 @@ You can also set the following environment variables:
 ```bash
 export POLYGLOT_BENCHMARK_PATH="/path/to/polyglot-benchmark"  # Path to the polyglot-benchmark repository
 export USE_UNIT_TESTS="true"  # Whether to run unit tests (default: true)
+export NO_DOCKER="true"  # Skip Docker container creation and use local runtime (default: false)
+export POLYGLOT_DOCKER_IMAGE="image:tag"  # Custom Docker image to use (default: ghcr.io/opendevin/eval-polyglot:v1.0.0)
 ```
+
+### Troubleshooting
+
+#### Docker Issues
+
+If you encounter Docker-related errors like:
+
+```
+Command 'docker buildx build ...' returned non-zero exit status 1
+```
+
+You can try the following solutions:
+
+1. Run with `NO_DOCKER=true` to use the local runtime instead:
+   ```bash
+   NO_DOCKER=true ./evaluation/benchmarks/polyglot_benchmark/scripts/run_infer.sh eval_gpt4_1106_preview HEAD CodeActAgent 1 1
+   ```
+
+2. Make sure Docker is installed and running:
+   ```bash
+   docker --version
+   docker ps
+   ```
+
+3. Check if you have permission to use Docker:
+   ```bash
+   sudo usermod -aG docker $USER
+   # Then log out and log back in
+   ```
 
 ### Example
 

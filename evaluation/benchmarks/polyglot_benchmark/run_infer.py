@@ -62,13 +62,21 @@ def get_config(
     instance: pd.Series,
     metadata: EvalMetadata,
 ) -> AppConfig:
+    # Determine runtime type based on environment variable
+    runtime_type = os.environ.get('RUNTIME', 'docker')
+    
+    # Check if NO_DOCKER is set to skip Docker container creation
+    if os.environ.get('NO_DOCKER', 'false').lower() == 'true':
+        runtime_type = 'local'
+        logger.info("Using local runtime instead of Docker due to NO_DOCKER=true")
+    
     config = AppConfig(
         default_agent=metadata.agent_class,
         run_as_openhands=False,
-        runtime=os.environ.get('RUNTIME', 'docker'),
+        runtime=runtime_type,
         max_iterations=metadata.max_iterations,
         sandbox=SandboxConfig(
-            base_container_image='ghcr.io/opendevin/eval-polyglot:v1.0.0',  # TODO: Create this image
+            base_container_image=os.environ.get('POLYGLOT_DOCKER_IMAGE', 'ghcr.io/opendevin/eval-polyglot:v1.0.0'),
             enable_auto_lint=True,
             use_host_network=False,
             timeout=300,  # Longer timeout for compilation
