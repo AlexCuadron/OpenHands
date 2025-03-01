@@ -53,164 +53,187 @@ Here's a running example of how to perform a task with the provided tools.
 
 --------------------- START OF EXAMPLE ---------------------
 
-USER: Create a list of numbers from 1 to 10, and display them in a web page at port 5000.
+USER: Problem: Convert the point $(0,3)$ in rectangular coordinates to polar coordinates. Enter your answer in the form $(r,\\theta),$ where $r > 0$ and $0 \\le \\theta < 2 \\pi.$
 
-ASSISTANT: Sure! Let me first check the current directory:
-<function=execute_bash>
-<parameter=command>
-pwd && ls
+ASSISTANT: I'll solve this step by step and verify my solution using Python.
+
+To convert from rectangular coordinates $(x,y)$ to polar coordinates $(r,\\theta)$, I'll use these formulas:
+- $r = \\sqrt{x^2 + y^2}$
+- $\\theta = \\arctan2(y, x)$
+
+For the point $(0,3)$:
+- $x = 0$
+- $y = 3$
+
+Let me calculate $r$ and $\\theta$ and verify with Python:
+
+<function=execute_ipython_cell>
+<parameter=code>
+import numpy as np
+import math
+
+# Given point
+x, y = 0, 3
+
+# Calculate r
+r = np.sqrt(x**2 + y**2)
+print(f"r = √({x}² + {y}²) = {r}")
+
+# Calculate θ using arctan2 which handles the quadrant correctly
+theta = np.arctan2(y, x)
+print(f"θ = arctan2({y}, {x}) = {theta} radians")
+
+# Convert to degrees for clarity
+theta_degrees = np.degrees(theta)
+print(f"θ = {theta_degrees} degrees")
+
+# Ensure θ is in the range [0, 2π)
+if theta < 0:
+    theta += 2 * np.pi
+    
+print(f"\\nFinal polar coordinates: r = {r}, θ = {theta} radians")
+print(f"In the format (r, θ): ({r}, {theta})")
 </parameter>
 </function>
 
-USER: EXECUTION RESULT of [execute_bash]:
-/workspace
-openhands@runtime:~/workspace$
+USER: EXECUTION RESULT of [execute_ipython_cell]:
+r = √(0² + 3²) = 3.0
+θ = arctan2(3, 0) = 1.5707963267948966 radians
+θ = 90.0 degrees
 
-ASSISTANT: There is no `app.py` file in the current directory. Let me create a Python file `app.py`:
-<function=str_replace_editor>
-<parameter=command>create</parameter>
-<parameter=path>/workspace/app.py</parameter>
-<parameter=file_text>
-from flask import Flask
-app = Flask(__name__)
+Final polar coordinates: r = 3.0, θ = 1.5707963267948966 radians
+In the format (r, θ): (3.0, 1.5707963267948966)
 
-@app.route('/')
-def index():
-    numbers = list(range(1, 11))
-    return str(numbers)
+ASSISTANT: Based on my calculations and Python verification, I can see that:
+- $r = 3$
+- $\\theta = \\frac{\\pi}{2} \\approx 1.5708$ radians (90 degrees)
 
-if __name__ == '__main__':
-    app.run(port=5000)
-</parameter>
-</function>
+This makes sense because the point $(0,3)$ lies directly on the positive y-axis, which corresponds to an angle of 90 degrees or $\\frac{\\pi}{2}$ radians.
 
-USER: EXECUTION RESULT of [str_replace_editor]:
-File created successfully at: /workspace/app.py
+Therefore, the polar coordinates of the point $(0,3)$ are $(3, \\frac{\\pi}{2})$.
 
-ASSISTANT: I have created a Python file `app.py` that will display a list of numbers from 1 to 10 when you run it. Let me run the Python file for you:
-<function=execute_bash>
-<parameter=command>
-python3 app.py > server.log 2>&1 &
-</parameter>
-</function>
-
-USER: EXECUTION RESULT of [execute_bash]:
-[1] 121
-[1]+  Exit 1                  python3 app.py > server.log 2>&1
-
-ASSISTANT: Looks like the server is running with PID 121 then crashed. Let me check the server log:
-<function=execute_bash>
-<parameter=command>
-cat server.log
-</parameter>
-</function>
-
-USER: EXECUTION RESULT of [execute_bash]:
-Traceback (most recent call last):
-  File "/workspace/app.py", line 2, in <module>
-    from flask import Flask
-ModuleNotFoundError: No module named 'flask'
-
-ASSISTANT: Looks like the server crashed because the `flask` module is not installed. Let me install the `flask` module for you:
-<function=execute_bash>
-<parameter=command>
-pip3 install flask
-</parameter>
-</function>
-
-USER: EXECUTION RESULT of [execute_bash]:
-Defaulting to user installation because normal site-packages is not writeable
-Collecting flask
-  Using cached flask-3.0.3-py3-none-any.whl (101 kB)
-Collecting blinker>=1.6.2
-  Using cached blinker-1.7.0-py3-none-any.whl (13 kB)
-Collecting Werkzeug>=3.0.0
-  Using cached werkzeug-3.0.2-py3-none-any.whl (226 kB)
-Collecting click>=8.1.3
-  Using cached click-8.1.7-py3-none-any.whl (97 kB)
-Collecting itsdangerous>=2.1.2
-  Using cached itsdangerous-2.2.0-py3-none-any.whl (16 kB)
-Requirement already satisfied: Jinja2>=3.1.2 in /home/openhands/.local/lib/python3.10/site-packages (from flask) (3.1.3)
-Requirement already satisfied: MarkupSafe>=2.0 in /home/openhands/.local/lib/python3.10/site-packages (from Jinja2>=3.1.2->flask) (2.1.5)
-Installing collected packages: Werkzeug, itsdangerous, click, blinker, flask
-Successfully installed Werkzeug-3.0.2 blinker-1.7.0 click-8.1.7 flask-3.0.3 itsdangerous-2.2.0
-
-ASSISTANT: The `flask` module is installed successfully. Let me run the Python file again:
-<function=execute_bash>
-<parameter=command>
-python3 app.py > server.log 2>&1 &
-</parameter>
-</function>
-
-USER: EXECUTION RESULT of [execute_bash]:
-[1] 124
-
-ASSISTANT:
-Let me check the server log again:
-<function=execute_bash>
-<parameter=command>
-cat server.log
-</parameter>
-</function>
-
-USER: EXECUTION RESULT of [execute_bash]:
-* Serving Flask app 'app'
- * Debug mode: off
-WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
- * Running on http://127.0.0.1:5000
-Press CTRL+C to quit
-
-ASSISTANT:
-The server is running on port 5000 with PID 124. You can access the list of numbers by visiting http://127.0.0.1:5000. If you have any further questions, feel free to ask!
-
-USER: Now kill the server, make it display the numbers in a table format.
-
-ASSISTANT:
-Sure! Let me stop the server first:
-<function=execute_bash>
-<parameter=command>
-kill 124
-</parameter>
-</function>
-
-USER: EXECUTION RESULT of [execute_bash]:
-[1]+  Terminated              python3 app.py > server.log 2>&1
-
-ASSISTANT:
-Now let me display the numbers in a table format:
-<function=str_replace_editor>
-<parameter=command>str_replace</parameter>
-<parameter=path>/workspace/app.py</parameter>
-<parameter=old_str>return str(numbers)</parameter>
-<parameter=new_str>return '<table>' + ''.join([f'<tr><td>{i}</td></tr>' for i in numbers]) + '</table>'</parameter>
-</function>
-
-USER: EXECUTION RESULT of [str_replace_editor]:
-The file /workspace/app.py has been edited. Here's the result of running `cat -n` on a snippet of /workspace/app.py:
-     3
-     4  @app.route('/')
-     5  def index():
-     6      numbers = list(range(1, 11))
-     7      return '<table>' + ''.join([f'<tr><td>{i}</td></tr>' for i in numbers]) + '</table>'
-     8
-     9  if __name__ == '__main__':
-    10      app.run(port=5000)
-Review the changes and make sure they are as expected. Edit the file again if necessary.
-
-ASSISTANT:
-Running the updated file:
-<function=execute_bash>
-<parameter=command>
-python3 app.py > server.log 2>&1 &
-</parameter>
-</function>
-
-USER: EXECUTION RESULT of [execute_bash]:
-[1] 126
-
-ASSISTANT:
-The server is running on port 5000 with PID 126. You can access the list of numbers in a table format by visiting http://127.0.0.1:5000. Let me know if you have any further requests!
 <function=finish>
+<parameter=solution>\\boxed{(3, \\frac{\\pi}{2})}</parameter>
+</function>
+
+USER: Problem: Find the derivative of $f(x) = x^3 - 4x^2 + 5x - 2$ at $x = 3$.
+
+ASSISTANT: I'll find the derivative of the given function and evaluate it at x = 3.
+
+First, I need to find the derivative of $f(x) = x^3 - 4x^2 + 5x - 2$.
+
+Using the power rule and linearity of differentiation:
+- The derivative of $x^3$ is $3x^2$
+- The derivative of $-4x^2$ is $-8x$
+- The derivative of $5x$ is $5$
+- The derivative of $-2$ is $0$
+
+So, $f'(x) = 3x^2 - 8x + 5$
+
+Now I need to evaluate $f'(3)$. Let me use Python to verify my calculations:
+
+<function=execute_ipython_cell>
+<parameter=code>
+import numpy as np
+from sympy import symbols, diff, sympify
+
+# Define the symbolic variable
+x = symbols('x')
+
+# Define the function
+f_expr = x**3 - 4*x**2 + 5*x - 2
+print(f"Function: f(x) = {f_expr}")
+
+# Calculate the derivative
+f_prime = diff(f_expr, x)
+print(f"Derivative: f'(x) = {f_prime}")
+
+# Evaluate the derivative at x = 3
+x_value = 3
+f_prime_at_3 = f_prime.subs(x, x_value)
+print(f"f'({x_value}) = {f_prime_at_3}")
+
+# Double-check with numerical calculation
+def f(x):
+    return x**3 - 4*x**2 + 5*x - 2
+
+# Numerical approximation of derivative
+h = 0.0001
+numerical_derivative = (f(x_value + h) - f(x_value)) / h
+print(f"Numerical check: f'({x_value}) ≈ {numerical_derivative}")
+</parameter>
+</function>
+
+USER: EXECUTION RESULT of [execute_ipython_cell]:
+Function: f(x) = x**3 - 4*x**2 + 5*x - 2
+Derivative: f'(x) = 3*x**2 - 8*x + 5
+f'(3) = 16
+Numerical check: f'(3) ≈ 16.00029999243764
+
+ASSISTANT: Based on my calculations and Python verification:
+
+1. The function is $f(x) = x^3 - 4x^2 + 5x - 2$
+2. The derivative is $f'(x) = 3x^2 - 8x + 5$
+3. Evaluating at $x = 3$:
+   $f'(3) = 3(3)^2 - 8(3) + 5$
+   $f'(3) = 3(9) - 24 + 5$
+   $f'(3) = 27 - 24 + 5$
+   $f'(3) = 8$
+
+Wait, there seems to be a discrepancy between my manual calculation and the Python result. Let me recalculate:
+
+$f'(3) = 3(3)^2 - 8(3) + 5$
+$f'(3) = 3 \times 9 - 8 \times 3 + 5$
+$f'(3) = 27 - 24 + 5$
+$f'(3) = 8$
+
+But the Python calculation gave $f'(3) = 16$. Let me double-check my work:
+
+<function=execute_ipython_cell>
+<parameter=code>
+# Let's calculate step by step
+x_value = 3
+
+# Calculate each term separately
+term1 = 3 * (x_value**2)
+term2 = -8 * x_value
+term3 = 5
+
+print(f"3x² = 3 × {x_value}² = 3 × {x_value**2} = {term1}")
+print(f"-8x = -8 × {x_value} = {term2}")
+print(f"Constant term = {term3}")
+print(f"Sum = {term1} + {term2} + {term3} = {term1 + term2 + term3}")
+</parameter>
+</function>
+
+USER: EXECUTION RESULT of [execute_ipython_cell]:
+3x² = 3 × 3² = 3 × 9 = 27
+-8x = -8 × 3 = -24
+Constant term = 5
+Sum = 27 + -24 + 5 = 8
+
+ASSISTANT: I see the issue now. There was an error in my Python calculation earlier, but my manual calculation was correct.
+
+Let's summarize:
+
+1. The function is $f(x) = x^3 - 4x^2 + 5x - 2$
+2. The derivative is $f'(x) = 3x^2 - 8x + 5$
+3. Evaluating at $x = 3$:
+   $f'(3) = 3(3)^2 - 8(3) + 5$
+   $f'(3) = 3 \times 9 - 8 \times 3 + 5$
+   $f'(3) = 27 - 24 + 5$
+   $f'(3) = 8$
+
+My second Python calculation confirms this result:
+- $3x^2 = 3 \times 3^2 = 3 \times 9 = 27$
+- $-8x = -8 \times 3 = -24$
+- Constant term = $5$
+- Sum = $27 + (-24) + 5 = 8$
+
+Therefore, the derivative of $f(x) = x^3 - 4x^2 + 5x - 2$ at $x = 3$ is $8$.
+
+<function=finish>
+<parameter=solution>\\boxed{8}</parameter>
 </function>
 
 --------------------- END OF EXAMPLE ---------------------
@@ -344,30 +367,39 @@ def convert_fncall_messages_to_non_fncall_messages(
             # Add in-context learning example for the first user message
             if not first_user_message_encountered and add_in_context_learning_example:
                 first_user_message_encountered = True
-                # Check tools
+                # Check tools - need either execute_bash or execute_ipython_cell, and finish
                 if not (
                     tools
                     and len(tools) > 0
-                    and any(
-                        (
-                            tool['type'] == 'function'
-                            and tool['function']['name'] == 'execute_bash'
-                            and 'parameters' in tool['function']
-                            and 'properties' in tool['function']['parameters']
-                            and 'command' in tool['function']['parameters']['properties']
+                    and (
+                        # Either bash tool is available
+                        any(
+                            (
+                                tool['type'] == 'function'
+                                and tool['function']['name'] == 'execute_bash'
+                                and 'parameters' in tool['function']
+                                and 'properties' in tool['function']['parameters']
+                                and 'command' in tool['function']['parameters']['properties']
+                            )
+                            for tool in tools
                         )
-                        for tool in tools
+                        or
+                        # Or IPython tool is available
+                        any(
+                            (
+                                tool['type'] == 'function'
+                                and tool['function']['name'] == 'execute_ipython_cell'
+                                and 'parameters' in tool['function']
+                                and 'properties' in tool['function']['parameters']
+                                and 'code' in tool['function']['parameters']['properties']
+                            )
+                            for tool in tools
+                        )
                     )
                     and any(
                         (
                             tool['type'] == 'function'
-                            and tool['function']['name'] == 'str_replace_editor'
-                            and 'parameters' in tool['function']
-                            and 'properties' in tool['function']['parameters']
-                            and 'path' in tool['function']['parameters']['properties']
-                            and 'file_text' in tool['function']['parameters']['properties']
-                            and 'old_str' in tool['function']['parameters']['properties']
-                            and 'new_str' in tool['function']['parameters']['properties']
+                            and tool['function']['name'] == 'finish'
                         )
                         for tool in tools
                     )
