@@ -656,17 +656,36 @@ class LLM(RetryMixin, DebugMixin):
                     cost = litellm_completion_cost(
                         completion_response=response, **extra_kwargs
                     )
+                except ValueError as e:
+                    # If the model isn't mapped in LiteLLM's cost database, just set cost to 0.0 silently
+                    if "This model isn't mapped yet" in str(e):
+                        cost = 0.0
+                        # Don't log anything for unmapped models to avoid polluting the output
+                    else:
+                        logger.error(f'Error getting cost from litellm: {e}')
                 except Exception as e:
-                    logger.error(f'Error getting cost from litellm: {e}')
+                    # Don't log anything for exceptions to avoid polluting the output
+                    cost = 0.0
 
             if cost is None:
                 _model_name = '/'.join(self.config.model.split('/')[1:])
-                cost = litellm_completion_cost(
-                    completion_response=response, model=_model_name, **extra_kwargs
-                )
-                logger.debug(
-                    f'Using fallback model name {_model_name} to get cost: {cost}'
-                )
+                try:
+                    cost = litellm_completion_cost(
+                        completion_response=response, model=_model_name, **extra_kwargs
+                    )
+                    logger.debug(
+                        f'Using fallback model name {_model_name} to get cost: {cost}'
+                    )
+                except ValueError as e:
+                    # If the model isn't mapped in LiteLLM's cost database, just set cost to 0.0 silently
+                    if "This model isn't mapped yet" in str(e):
+                        cost = 0.0
+                        # Don't log anything for unmapped models to avoid polluting the output
+                    else:
+                        logger.error(f'Error getting cost from litellm with fallback model name: {e}')
+                except Exception:
+                    # Don't log anything for exceptions to avoid polluting the output
+                    cost = 0.0
             self.metrics.add_cost(cost)
             return cost
         except Exception:

@@ -220,7 +220,8 @@ def get_tools(
     codeact_enable_llm_editor: bool = False,
     codeact_enable_jupyter: bool = False,
 ) -> list[ChatCompletionToolParam]:
-    tools = [CmdRunTool, ThinkTool, FinishTool]
+    # Default behavior
+    tools = [CmdRunTool, FinishTool]
     if codeact_enable_browsing:
         tools.append(WebReadTool)
         tools.append(BrowserTool)

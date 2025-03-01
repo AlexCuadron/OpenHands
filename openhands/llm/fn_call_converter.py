@@ -53,164 +53,171 @@ Here's a running example of how to perform a task with the provided tools.
 
 --------------------- START OF EXAMPLE ---------------------
 
-USER: Create a list of numbers from 1 to 10, and display them in a web page at port 5000.
+USER: Problem: Convert the point $(0,3)$ in rectangular coordinates to polar coordinates. Enter your answer in the form $(r,\\theta),$ where $r > 0$ and $0 \\le \\theta < 2 \\pi.$
 
-ASSISTANT: Sure! Let me first check the current directory:
-<function=execute_bash>
-<parameter=command>
-pwd && ls
+ASSISTANT: I need to convert the rectangular coordinates $(0,3)$ to polar coordinates $(r,\\theta)$.
+
+For the conversion, I'll use these formulas:
+- $r = \\sqrt{x^2 + y^2}$
+- $\\theta = \\arctan(\\frac{y}{x})$
+
+Given the point $(0,3)$:
+- $x = 0$
+- $y = 3$
+
+First, I'll calculate $r$:
+$r = \\sqrt{0^2 + 3^2} = \\sqrt{9} = 3$
+
+Now for $\\theta$, I need to calculate $\\arctan(\\frac{y}{x}) = \\arctan(\\frac{3}{0})$
+
+Wait, this is a problem because division by zero is undefined. Since $x = 0$ and $y > 0$, the point lies on the positive y-axis, which corresponds to an angle of $\\theta = \\frac{\\pi}{2}$ or 90 degrees.
+
+Let me verify my reasoning with Python:
+
+<function=execute_ipython_cell>
+<parameter=code>
+import numpy as np
+import math
+
+# Given point
+x, y = 0, 3
+
+# Calculate r
+r = np.sqrt(x**2 + y**2)
+print(f"r = √({x}² + {y}²) = {r}")
+
+# Try to calculate θ using the standard arctan formula
+print("Attempting standard arctan formula:")
+try:
+    theta_standard = np.arctan(y/x)
+    print(f"θ = arctan({y}/{x}) = {theta_standard} radians")
+except ZeroDivisionError:
+    print(f"Error: Division by zero when calculating arctan({y}/{x})")
 </parameter>
 </function>
 
-USER: EXECUTION RESULT of [execute_bash]:
-/workspace
-openhands@runtime:~/workspace$
+USER: EXECUTION RESULT of [execute_ipython_cell]:
+r = √(0² + 3²) = 3.0
+Attempting standard arctan formula:
+Error: Division by zero when calculating arctan(3/0)
 
-ASSISTANT: There is no `app.py` file in the current directory. Let me create a Python file `app.py`:
-<function=str_replace_editor>
-<parameter=command>create</parameter>
-<parameter=path>/workspace/app.py</parameter>
-<parameter=file_text>
-from flask import Flask
-app = Flask(__name__)
+ASSISTANT: I see that my calculation for $r = 3$ is correct, but as I suspected, the standard arctangent formula leads to a division by zero error when $x = 0$.
 
-@app.route('/')
-def index():
-    numbers = list(range(1, 11))
-    return str(numbers)
+For points on the y-axis, I need to use a different approach. Let me try using the `arctan2` function, which is specifically designed to handle all quadrants and special cases:
 
-if __name__ == '__main__':
-    app.run(port=5000)
+<function=execute_ipython_cell>
+<parameter=code>
+import numpy as np
+
+# Given point
+x, y = 0, 3
+
+# Calculate θ using arctan2 which handles special cases
+theta = np.arctan2(y, x)
+print(f"θ = arctan2({y}, {x}) = {theta} radians")
+print(f"θ = {np.degrees(theta)} degrees")
+
+# Check if θ is in the range [0, 2π)
+if theta < 0:
+    theta += 2 * np.pi
+    print(f"Adjusted θ to be in [0, 2π) range: {theta} radians")
+else:
+    print(f"θ is already in [0, 2π) range: {theta} radians")
 </parameter>
 </function>
 
-USER: EXECUTION RESULT of [str_replace_editor]:
-File created successfully at: /workspace/app.py
+USER: EXECUTION RESULT of [execute_ipython_cell]:
+θ = arctan2(3, 0) = 1.5707963267948966 radians
+θ = 90.0 degrees
+θ is already in [0, 2π) range: 1.5707963267948966 radians
 
-ASSISTANT: I have created a Python file `app.py` that will display a list of numbers from 1 to 10 when you run it. Let me run the Python file for you:
-<function=execute_bash>
-<parameter=command>
-python3 app.py > server.log 2>&1 &
+ASSISTANT: Great! The `arctan2` function confirms that for the point $(0,3)$:
+- $\\theta = 1.5707963267948966$ radians
+- $\\theta = 90$ degrees
+- This angle is already in the required range $[0, 2\\pi)$
+
+This matches my reasoning that when a point is on the positive y-axis, the angle is $\\frac{\\pi}{2}$ or 90 degrees.
+
+Let me double-check that this is the correct representation in polar coordinates by converting back to rectangular coordinates:
+
+<function=execute_ipython_cell>
+<parameter=code>
+import numpy as np
+
+# Polar coordinates
+r = 3.0
+theta = 1.5707963267948966  # π/2 radians (90 degrees)
+
+# Convert back to rectangular coordinates
+x_back = r * np.cos(theta)
+y_back = r * np.sin(theta)
+
+print(f"Converting from polar (r={r}, θ={theta} radians) back to rectangular:")
+print(f"x = r·cos(θ) = {r} · cos({theta}) = {x_back}")
+print(f"y = r·sin(θ) = {r} · sin({theta}) = {y_back}")
+
+# Check if we get back to our original point (0,3)
+print(f"\nOriginal point: (0, 3)")
+print(f"Converted back point: ({x_back:.10f}, {y_back:.10f})")
+
+# Check for numerical precision issues
+if abs(x_back) < 1e-10:
+    print("x is effectively zero (within numerical precision)")
 </parameter>
 </function>
 
-USER: EXECUTION RESULT of [execute_bash]:
-[1] 121
-[1]+  Exit 1                  python3 app.py > server.log 2>&1
+USER: EXECUTION RESULT of [execute_ipython_cell]:
+Converting from polar (r=3.0, θ=1.5707963267948966 radians) back to rectangular:
+x = r·cos(θ) = 3.0 · cos(1.5707963267948966) = 1.8369701987210297e-16
+y = r·sin(θ) = 3.0 · sin(1.5707963267948966) = 3.0
 
-ASSISTANT: Looks like the server is running with PID 121 then crashed. Let me check the server log:
-<function=execute_bash>
-<parameter=command>
-cat server.log
+Original point: (0, 3)
+Converted back point: (0.0000000000, 3.0000000000)
+x is effectively zero (within numerical precision)
+
+ASSISTANT: Perfect! The conversion back to rectangular coordinates confirms our polar representation is correct:
+- When converting $(r=3, \\theta=\\frac{\\pi}{2})$ back to rectangular coordinates, we get $(0, 3)$
+- The x-value is not exactly zero but $1.8369701987210297 \\times 10^{-16}$, which is effectively zero due to floating-point precision limitations
+
+Let me verify one more thing - I want to make sure I understand the range requirement correctly. The problem asks for $0 \\le \\theta < 2\\pi$:
+
+<function=execute_ipython_cell>
+<parameter=code>
+import numpy as np
+
+# Check if our theta is in the required range
+theta = 1.5707963267948966  # π/2 radians
+pi = np.pi
+
+print(f"θ = {theta} radians")
+print(f"π/2 = {pi/2} radians")
+print(f"2π = {2*pi} radians")
+
+# Check range requirement
+in_range = 0 <= theta < 2*pi
+print(f"Is θ in the range [0, 2π)? {in_range}")
+
+# Express in terms of π for mathematical notation
+print(f"θ = {theta/pi}π radians")
 </parameter>
 </function>
 
-USER: EXECUTION RESULT of [execute_bash]:
-Traceback (most recent call last):
-  File "/workspace/app.py", line 2, in <module>
-    from flask import Flask
-ModuleNotFoundError: No module named 'flask'
+USER: EXECUTION RESULT of [execute_ipython_cell]:
+θ = 1.5707963267948966 radians
+π/2 = 1.5707963267948966 radians
+2π = 6.283185307179586 radians
+Is θ in the range [0, 2π)? True
+θ = 0.5π radians
 
-ASSISTANT: Looks like the server crashed because the `flask` module is not installed. Let me install the `flask` module for you:
-<function=execute_bash>
-<parameter=command>
-pip3 install flask
-</parameter>
-</function>
+ASSISTANT: This confirms that our answer is correct and meets all the requirements:
+1. We have $r = 3$, which is positive as required
+2. We have $\\theta = \\frac{\\pi}{2} = 1.5707963267948966$ radians, which is in the range $[0, 2\\pi)$
+3. When converted back to rectangular coordinates, these polar coordinates correctly represent the original point $(0,3)$
 
-USER: EXECUTION RESULT of [execute_bash]:
-Defaulting to user installation because normal site-packages is not writeable
-Collecting flask
-  Using cached flask-3.0.3-py3-none-any.whl (101 kB)
-Collecting blinker>=1.6.2
-  Using cached blinker-1.7.0-py3-none-any.whl (13 kB)
-Collecting Werkzeug>=3.0.0
-  Using cached werkzeug-3.0.2-py3-none-any.whl (226 kB)
-Collecting click>=8.1.3
-  Using cached click-8.1.7-py3-none-any.whl (97 kB)
-Collecting itsdangerous>=2.1.2
-  Using cached itsdangerous-2.2.0-py3-none-any.whl (16 kB)
-Requirement already satisfied: Jinja2>=3.1.2 in /home/openhands/.local/lib/python3.10/site-packages (from flask) (3.1.3)
-Requirement already satisfied: MarkupSafe>=2.0 in /home/openhands/.local/lib/python3.10/site-packages (from Jinja2>=3.1.2->flask) (2.1.5)
-Installing collected packages: Werkzeug, itsdangerous, click, blinker, flask
-Successfully installed Werkzeug-3.0.2 blinker-1.7.0 click-8.1.7 flask-3.0.3 itsdangerous-2.2.0
+Therefore, the polar coordinates of the point $(0,3)$ are $(3, \\frac{\\pi}{2})$.
 
-ASSISTANT: The `flask` module is installed successfully. Let me run the Python file again:
-<function=execute_bash>
-<parameter=command>
-python3 app.py > server.log 2>&1 &
-</parameter>
-</function>
-
-USER: EXECUTION RESULT of [execute_bash]:
-[1] 124
-
-ASSISTANT:
-Let me check the server log again:
-<function=execute_bash>
-<parameter=command>
-cat server.log
-</parameter>
-</function>
-
-USER: EXECUTION RESULT of [execute_bash]:
-* Serving Flask app 'app'
- * Debug mode: off
-WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
- * Running on http://127.0.0.1:5000
-Press CTRL+C to quit
-
-ASSISTANT:
-The server is running on port 5000 with PID 124. You can access the list of numbers by visiting http://127.0.0.1:5000. If you have any further questions, feel free to ask!
-
-USER: Now kill the server, make it display the numbers in a table format.
-
-ASSISTANT:
-Sure! Let me stop the server first:
-<function=execute_bash>
-<parameter=command>
-kill 124
-</parameter>
-</function>
-
-USER: EXECUTION RESULT of [execute_bash]:
-[1]+  Terminated              python3 app.py > server.log 2>&1
-
-ASSISTANT:
-Now let me display the numbers in a table format:
-<function=str_replace_editor>
-<parameter=command>str_replace</parameter>
-<parameter=path>/workspace/app.py</parameter>
-<parameter=old_str>return str(numbers)</parameter>
-<parameter=new_str>return '<table>' + ''.join([f'<tr><td>{i}</td></tr>' for i in numbers]) + '</table>'</parameter>
-</function>
-
-USER: EXECUTION RESULT of [str_replace_editor]:
-The file /workspace/app.py has been edited. Here's the result of running `cat -n` on a snippet of /workspace/app.py:
-     3
-     4  @app.route('/')
-     5  def index():
-     6      numbers = list(range(1, 11))
-     7      return '<table>' + ''.join([f'<tr><td>{i}</td></tr>' for i in numbers]) + '</table>'
-     8
-     9  if __name__ == '__main__':
-    10      app.run(port=5000)
-Review the changes and make sure they are as expected. Edit the file again if necessary.
-
-ASSISTANT:
-Running the updated file:
-<function=execute_bash>
-<parameter=command>
-python3 app.py > server.log 2>&1 &
-</parameter>
-</function>
-
-USER: EXECUTION RESULT of [execute_bash]:
-[1] 126
-
-ASSISTANT:
-The server is running on port 5000 with PID 126. You can access the list of numbers in a table format by visiting http://127.0.0.1:5000. Let me know if you have any further requests!
 <function=finish>
+<parameter=solution>\\boxed{(3, \\frac{\\pi}{2})}</parameter>
 </function>
 
 --------------------- END OF EXAMPLE ---------------------
@@ -344,30 +351,39 @@ def convert_fncall_messages_to_non_fncall_messages(
             # Add in-context learning example for the first user message
             if not first_user_message_encountered and add_in_context_learning_example:
                 first_user_message_encountered = True
-                # Check tools
+                # Check tools - need either execute_bash or execute_ipython_cell, and finish
                 if not (
                     tools
                     and len(tools) > 0
-                    and any(
-                        (
-                            tool['type'] == 'function'
-                            and tool['function']['name'] == 'execute_bash'
-                            and 'command'
-                            in tool['function']['parameters']['properties']
+                    and (
+                        # Either bash tool is available
+                        any(
+                            (
+                                tool['type'] == 'function'
+                                and tool['function']['name'] == 'execute_bash'
+                                and 'parameters' in tool['function']
+                                and 'properties' in tool['function']['parameters']
+                                and 'command' in tool['function']['parameters']['properties']
+                            )
+                            for tool in tools
                         )
-                        for tool in tools
+                        or
+                        # Or IPython tool is available
+                        any(
+                            (
+                                tool['type'] == 'function'
+                                and tool['function']['name'] == 'execute_ipython_cell'
+                                and 'parameters' in tool['function']
+                                and 'properties' in tool['function']['parameters']
+                                and 'code' in tool['function']['parameters']['properties']
+                            )
+                            for tool in tools
+                        )
                     )
                     and any(
                         (
                             tool['type'] == 'function'
-                            and tool['function']['name'] == 'str_replace_editor'
-                            and 'path' in tool['function']['parameters']['properties']
-                            and 'file_text'
-                            in tool['function']['parameters']['properties']
-                            and 'old_str'
-                            in tool['function']['parameters']['properties']
-                            and 'new_str'
-                            in tool['function']['parameters']['properties']
+                            and tool['function']['name'] == 'finish'
                         )
                         for tool in tools
                     )
@@ -528,7 +544,10 @@ def _extract_and_validate_params(
                 pass
 
         # Enum check
-        if 'enum' in matching_tool['parameters']['properties'][param_name]:
+        if ('parameters' in matching_tool and 
+            'properties' in matching_tool['parameters'] and 
+            param_name in matching_tool['parameters']['properties'] and
+            'enum' in matching_tool['parameters']['properties'][param_name]):
             if (
                 param_value
                 not in matching_tool['parameters']['properties'][param_name]['enum']
