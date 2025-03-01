@@ -47,14 +47,12 @@ def get_config(
 ) -> AppConfig:
     sandbox_config = get_default_sandbox_config_for_eval()
     
-    # Use a base image that already has scientific libraries installed
-    sandbox_config.base_container_image = 'jupyter/scipy-notebook:latest'
+    # Use the default Python image
+    sandbox_config.base_container_image = 'python:3.11-bookworm'
     
-    # Add environment variables to ensure the agent knows about the pre-installed libraries
-    sandbox_config.runtime_startup_env_vars = {
-        "PYTHONPATH": "/opt/conda/lib/python3.10/site-packages",
-        "MATH_LIBRARIES_INSTALLED": "true"
-    }
+    # Add extra dependencies to install math libraries
+    # This will be added to the Dockerfile
+    sandbox_config.runtime_extra_deps = "pip install --no-cache-dir sympy numpy scipy matplotlib pandas"
     
     config = AppConfig(
         default_agent=metadata.agent_class,
