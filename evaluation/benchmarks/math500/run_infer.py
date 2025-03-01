@@ -105,6 +105,16 @@ def get_config(
     llm_config = update_llm_config_for_completions_logging(
         metadata.llm_config, metadata.eval_output_dir, str(instance.instance_id)
     )
+    
+    # Check if the model supports function calling
+    # If not, disable function calling conversion
+    model_name = llm_config.model_name.lower()
+    if any(name in model_name for name in ['deepseek', 'together', 'llama', 'mistral']):
+        logger.info(f"Model {model_name} may not support function calling natively. Disabling function calling conversion.")
+        llm_config.supports_fn_calling = False
+        # For models that don't support function calling, we need to set tool_choice to 'none'
+        llm_config.tool_choice = 'none'
+    
     config.set_llm_config(llm_config)
     agent_config = config.get_agent_config(metadata.agent_class)
     agent_config.enable_prompt_extensions = False
