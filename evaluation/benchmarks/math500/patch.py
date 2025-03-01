@@ -48,8 +48,57 @@ def patch_codeact_agent():
         params: dict = {
             'messages': self.llm.format_messages_for_llm(messages),
         }
-        params['tools'] = self.tools
-        response = self.llm.completion(**params)
+        
+        # Check if the model supports function calling
+        model_name = self.llm.model.lower() if hasattr(self.llm, 'model') else ""
+        if any(name in model_name for name in ['deepseek', 'together', 'llama', 'mistral']):
+            # For models that don't support function calling, we'll use a text-only approach
+            # Add a special instruction to the last message
+            last_message = params['messages'][-1]
+            if isinstance(last_message, dict) and last_message.get('role') == 'user':
+                # Add instructions for using tools in text format
+                tool_instructions = "\n\nTo use tools, respond with:\n```\nTOOL: tool_name\nARGUMENTS: {\"arg1\": \"value1\", \"arg2\": \"value2\"}\n```\n\nAvailable tools:\n"
+                for tool in self.tools:
+                    if tool['type'] == 'function':
+                        tool_instructions += f"- {tool['function']['name']}: {tool['function']['description']}\n"
+                
+                last_message['content'] += tool_instructions
+                
+            # Don't include tools in the params
+            response = self.llm.completion(**params)
+            
+            # Parse the response to extract tool calls
+            if hasattr(response, 'choices') and len(response.choices) > 0:
+                choice = response.choices[0]
+                if hasattr(choice, 'message') and hasattr(choice.message, 'content'):
+                    content = choice.message.content
+                    # Look for tool calls in the format: TOOL: tool_name\nARGUMENTS: {...}
+                    import re
+                    import json
+                    tool_calls = []
+                    tool_pattern = r'TOOL:\s*(\w+)\s*\nARGUMENTS:\s*({.*?})'
+                    matches = re.findall(tool_pattern, content, re.DOTALL)
+                    for tool_name, args_str in matches:
+                        try:
+                            args = json.loads(args_str)
+                            tool_calls.append({
+                                'id': f'call_{len(tool_calls)}',
+                                'type': 'function',
+                                'function': {
+                                    'name': tool_name,
+                                    'arguments': json.dumps(args)
+                                }
+                            })
+                        except json.JSONDecodeError:
+                            pass
+                    
+                    # Add tool_calls to the message
+                    if tool_calls:
+                        choice.message.tool_calls = tool_calls
+        else:
+            # For models that support function calling, use the normal approach
+            params['tools'] = self.tools
+            response = self.llm.completion(**params)
 
         # Use our custom response_to_actions function
         actions = response_to_actions(response)
