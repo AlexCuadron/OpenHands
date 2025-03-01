@@ -81,29 +81,35 @@ def get_config(
         # Default configuration - disable browsing
         agent_config.codeact_enable_browsing = False
         
-        # Get the allowed tools from the metadata
-        allowed_tools = getattr(metadata, 'allowed_tools', 'all')
+        # Get the allowed tools from the metadata details
+        allowed_tools = metadata.details.get('allowed_tools', 'all') if metadata.details else 'all'
         
         if allowed_tools == 'ipython_only':
             # Only enable IPython tool
             agent_config.codeact_enable_jupyter = True
             agent_config.codeact_enable_llm_editor = False
             # We'll override the tools after agent initialization
-            metadata.override_tools = [codeact_function_calling.IPythonTool, codeact_function_calling.FinishTool]
+            if metadata.details is None:
+                metadata.details = {}
+            metadata.details['override_tools'] = [codeact_function_calling.IPythonTool, codeact_function_calling.FinishTool]
             logger.info(f"Configured CodeActAgent for MATH500 benchmark with IPython tool only")
         elif allowed_tools == 'bash_only':
             # Only enable Bash tool
             agent_config.codeact_enable_jupyter = False
             agent_config.codeact_enable_llm_editor = False
             # We'll override the tools after agent initialization
-            metadata.override_tools = [codeact_function_calling.CmdRunTool, codeact_function_calling.FinishTool]
+            if metadata.details is None:
+                metadata.details = {}
+            metadata.details['override_tools'] = [codeact_function_calling.CmdRunTool, codeact_function_calling.FinishTool]
             logger.info(f"Configured CodeActAgent for MATH500 benchmark with Bash tool only")
         elif allowed_tools == 'no_editor':
             # Enable Bash and IPython but no editor
             agent_config.codeact_enable_jupyter = True
             agent_config.codeact_enable_llm_editor = False
             # We'll override the tools after agent initialization
-            metadata.override_tools = [
+            if metadata.details is None:
+                metadata.details = {}
+            metadata.details['override_tools'] = [
                 codeact_function_calling.CmdRunTool, 
                 codeact_function_calling.IPythonTool, 
                 codeact_function_calling.FinishTool
@@ -114,7 +120,9 @@ def get_config(
             agent_config.codeact_enable_jupyter = True
             agent_config.codeact_enable_llm_editor = False
             # No need to override tools
-            metadata.override_tools = None
+            if metadata.details is None:
+                metadata.details = {}
+            metadata.details['override_tools'] = None
             logger.info(f"Configured CodeActAgent for MATH500 benchmark with all tools (except browsing)")
 
     # copy 'draft_editor' config if exists
@@ -211,8 +219,8 @@ def process_instance(
     runtime: Runtime = create_runtime(config)
     call_async_from_sync(runtime.connect)
 
-    # Get the override_tools from metadata if it exists
-    override_tools = getattr(metadata, 'override_tools', None)
+    # Get the override_tools from metadata details if it exists
+    override_tools = metadata.details.get('override_tools', None) if metadata.details else None
     
     # Define a custom run_controller function that overrides the tools if needed
     async def custom_run_controller():
@@ -349,8 +357,10 @@ if __name__ == '__main__':
         details=agent_details,
     )
     
-    # Add the allowed_tools parameter to the metadata
-    metadata.allowed_tools = args.allowed_tools
+    # Add the allowed_tools parameter to the metadata details
+    if metadata.details is None:
+        metadata.details = {}
+    metadata.details['allowed_tools'] = args.allowed_tools
     output_file = os.path.join(metadata.eval_output_dir, 'output.jsonl')
 
     # Parse dataset IDs if provided
