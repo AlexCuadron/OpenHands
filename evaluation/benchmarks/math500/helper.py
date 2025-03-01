@@ -1,19 +1,16 @@
 from evaluation.utils.shared import codeact_user_response
 
 INSTRUCTIONS_ADDENDUM = """
-Please solve this math problem by using Python to verify each step of your reasoning. 
+Please solve this problem by using tools to verify each step of your reasoning. 
 
 IMPORTANT:
-- Use Python code execution to verify your calculations and reasoning at each step
-- Do NOT rely solely on your own mathematical reasoning - verify everything with code
-- If your code execution reveals errors in your reasoning, acknowledge the mistake and correct your approach
+- Use Python code execution to verify your thinking at EACH step
+- Do NOT rely solely on your own reasoning - verify everything with tools
+- If tool execution reveals errors in your thinking, acknowledge the mistake and correct your approach
+- Use tools to discover new information that might not be obvious from initial reasoning
+- Break down complex problems into smaller parts that can be verified with tools
 - The following libraries are pre-installed and ready to use:
-  * sympy - for symbolic mathematics (already imported as sp)
-  * numpy - for numerical computations (already imported as np)
-  * scipy - for scientific computing
-  * matplotlib - for plotting (plt is already imported)
-- Common sympy functions and symbols are pre-imported (symbols, solve, Eq, simplify, etc.)
-- Break down complex calculations into smaller parts that can be verified with code
+  * sympy, numpy, scipy, matplotlib, pandas (with common imports already set up)
 - When you have the final answer, please provide it in the format: "The answer is [your answer]"
 - You can also use LaTeX notation with \\boxed{} to highlight your final answer
 
@@ -46,7 +43,7 @@ def math500_user_response(state, **kwargs):
     
     if not has_used_python and recent_messages:
         # If the agent hasn't used Python in recent messages, encourage it to do so
-        return "Please use Python code execution to verify your calculations and reasoning. Don't rely solely on your own mathematical reasoning."
+        return "Please use tools to verify your reasoning. Don't rely solely on your own thinking - use tools to discover information that might contradict your initial assumptions."
     
     # Otherwise, use the standard CodeActAgent response
     return codeact_user_response(state)
@@ -57,11 +54,11 @@ FAKE_RESPONSES = {
 
 INST_SUFFIXES: dict[str, str] = {
     'CodeActAgent': (
-        'IMPORTANT: You MUST use Python code execution to verify your mathematical reasoning at EACH step. '
-        'Do not trust your own calculations without verification. '
-        'If Python execution reveals errors in your reasoning, acknowledge them and correct your approach. '
-        'Remember that sympy, numpy, scipy, and matplotlib are pre-installed with common imports already set up. '
-        'When you have the final answer (verified with code), use the "finish" tool with your solution as the parameter.\n'
+        'IMPORTANT: You MUST use tools to verify your reasoning at EACH step. '
+        'Do not trust your own reasoning without verification through tool execution. '
+        'If tool execution reveals errors in your thinking, acknowledge them and correct your approach. '
+        'The key insight is that by using tools, you will discover information that contradicts your initial reasoning. '
+        'When you have the final answer (verified with tools), use the "finish" tool with your solution as the parameter.\n'
         'For example: finish(solution="\\boxed{42}")\n'
     )
 }
