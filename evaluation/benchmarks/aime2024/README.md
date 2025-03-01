@@ -50,19 +50,36 @@ bash evaluation/benchmarks/aime2024/scripts/run_infer.sh togetherDeepseek HEAD C
 
 ## Analyzing Results
 
-To analyze the results of the benchmark:
+There are three ways to analyze the results of the benchmark:
+
+### 1. Using the eval_infer.sh script (recommended)
+
+If you already have an output.jsonl file from a previous run, you can analyze it directly:
+
+```bash
+bash evaluation/benchmarks/aime2024/scripts/eval_infer.sh <path-to-output-jsonl> [output-directory]
+```
+
+Example:
+```bash
+bash evaluation/benchmarks/aime2024/scripts/eval_infer.sh ./evaluation/evaluation_outputs/AIME2024/CodeActAgent/v0.26.0/output.jsonl
+```
+
+### 2. Using the analyze_results.py script directly
 
 ```bash
 poetry run python evaluation/benchmarks/aime2024/scripts/analyze_results.py <path-to-results-jsonl> --output-dir <output-directory>
 ```
 
-Or simply include "eval" in your command to automatically run the analysis after the benchmark:
+### 3. Including "eval" in your benchmark run
+
+Simply include "eval" in your command to automatically run the analysis after the benchmark:
 
 ```bash
 bash evaluation/benchmarks/aime2024/scripts/run_infer.sh togetherDeepseek HEAD CodeActAgent 500 20 "" eval ipython_only
 ```
 
-This will generate:
+All methods will generate:
 - A summary of the results in JSON format
 - Plots of the overall accuracy and accuracy by problem ID
 - A detailed CSV file with the results for each problem
