@@ -9,9 +9,9 @@ IMPORTANT:
 - If tool execution reveals errors in your thinking, acknowledge the mistake and correct your approach
 - Use tools to discover new information that might not be obvious from initial reasoning
 - Break down complex problems into smaller parts that can be verified with tools
-- The following libraries are pre-installed and ready to use:
-  * sympy, numpy, scipy, matplotlib, pandas and other scientific libraries
-  * You can import them directly, e.g., `import sympy as sp` or `import numpy as np`
+- You should first install any libraries you need using %pip install:
+  * For mathematical problems, install sympy, numpy, scipy: `%pip install sympy numpy scipy matplotlib`
+  * Always verify that imports work before proceeding with your solution
 - When you have the final answer, please provide it in the format: "The answer is [your answer]"
 - You can also use LaTeX notation with \\boxed{} to highlight your final answer
 
@@ -42,7 +42,16 @@ def math500_user_response(state, **kwargs):
         for msg in recent_messages if msg
     )
     
-    if not has_used_python and recent_messages:
+    # Check if there was a ModuleNotFoundError in recent messages
+    module_error = any(
+        'ModuleNotFoundError' in msg or 'No module named' in msg
+        for msg in recent_messages if msg
+    )
+    
+    if module_error:
+        # If there was a module error, prompt to install the missing library
+        return "It looks like you need to install some Python libraries. Use %pip install to install the libraries you need (e.g., %pip install sympy numpy scipy matplotlib)."
+    elif not has_used_python and recent_messages:
         # If the agent hasn't used Python in recent messages, encourage it to do so
         return "Please use tools to verify your reasoning. Don't rely solely on your own thinking - use tools to discover information that might contradict your initial assumptions."
     
@@ -56,6 +65,7 @@ FAKE_RESPONSES = {
 INST_SUFFIXES: dict[str, str] = {
     'CodeActAgent': (
         'IMPORTANT: You MUST use tools to verify your reasoning at EACH step. '
+        'First, install any libraries you need using %pip install (e.g., %pip install sympy numpy scipy). '
         'Do not trust your own reasoning without verification through tool execution. '
         'If tool execution reveals errors in your thinking, acknowledge them and correct your approach. '
         'The key insight is that by using tools, you will discover information that contradicts your initial reasoning. '
