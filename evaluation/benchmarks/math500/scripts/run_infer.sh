@@ -11,6 +11,14 @@ NUM_WORKERS=$5
 EVAL_IDS=$6
 RUN_EVALUATION=$7  # New parameter to run evaluation after benchmark
 
+# If MODEL_CONFIG is "togetherDeepseek", use the appropriate configuration
+if [ "$MODEL_CONFIG" = "togetherDeepseek" ]; then
+  MODEL_CONFIG="llm"
+  export OPENAI_API_KEY="your-api-key-here"
+  export OPENAI_API_BASE="https://api.together.xyz/v1"
+  export OPENAI_MODEL="deepseek-coder/deepseek-coder-33b-instruct"
+fi
+
 # Special case: if the 7th parameter is "eval", set RUN_EVALUATION to "eval"
 if [ "$RUN_EVALUATION" = "eval" ]; then
   echo "Evaluation mode enabled"
