@@ -7,7 +7,12 @@ IMPORTANT:
 - Use Python code execution to verify your calculations and reasoning at each step
 - Do NOT rely solely on your own mathematical reasoning - verify everything with code
 - If your code execution reveals errors in your reasoning, acknowledge the mistake and correct your approach
-- Use symbolic math libraries like sympy when appropriate
+- The following libraries are pre-installed and ready to use:
+  * sympy - for symbolic mathematics (already imported as sp)
+  * numpy - for numerical computations (already imported as np)
+  * scipy - for scientific computing
+  * matplotlib - for plotting (plt is already imported)
+- Common sympy functions and symbols are pre-imported (symbols, solve, Eq, simplify, etc.)
 - Break down complex calculations into smaller parts that can be verified with code
 - When you have the final answer, please provide it in the format: "The answer is [your answer]"
 - You can also use LaTeX notation with \\boxed{} to highlight your final answer
@@ -55,6 +60,7 @@ INST_SUFFIXES: dict[str, str] = {
         'IMPORTANT: You MUST use Python code execution to verify your mathematical reasoning at EACH step. '
         'Do not trust your own calculations without verification. '
         'If Python execution reveals errors in your reasoning, acknowledge them and correct your approach. '
+        'Remember that sympy, numpy, scipy, and matplotlib are pre-installed with common imports already set up. '
         'When you have the final answer (verified with code), use the "finish" tool with your solution as the parameter.\n'
         'For example: finish(solution="\\boxed{42}")\n'
     )
