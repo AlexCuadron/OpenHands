@@ -2,7 +2,8 @@ import asyncio
 import copy
 import os
 import re
-from typing import Any, Optional
+import argparse
+from typing import Any, Optional, List
 
 import pandas as pd
 from datasets import load_dataset
@@ -29,12 +30,14 @@ from openhands.core.config import (
     get_llm_config_arg,
     load_from_toml,
     parse_arguments,
+    get_parser,
 )
 from openhands.core.logger import openhands_logger as logger
 from openhands.core.main import create_runtime, run_controller
 from openhands.events.action import AgentFinishAction, MessageAction
 from openhands.runtime.base import Runtime
 from openhands.utils.async_utils import call_async_from_sync
+import openhands.agenthub.codeact_agent.function_calling as codeact_function_calling
 
 
 def get_config(
@@ -72,13 +75,46 @@ def get_config(
     agent_config = config.get_agent_config(metadata.agent_class)
     agent_config.enable_prompt_extensions = False
     
-    # For MATH500 benchmark, configure the agent with the right tools
+    # For MATH500 benchmark, configure the agent with the right tools based on the allowed_tools parameter
     if metadata.agent_class == "CodeActAgent":
-        # Enable execute_bash, execute_ipython_cell, and str_replace_editor
+        # Default configuration - disable browsing
         agent_config.codeact_enable_browsing = False
-        agent_config.codeact_enable_llm_editor = False
-        agent_config.codeact_enable_jupyter = True
-        logger.info(f"Configured CodeActAgent for MATH500 benchmark with execute_bash, execute_ipython_cell, and str_replace_editor tools")
+        
+        # Get the allowed tools from the metadata
+        allowed_tools = getattr(metadata, 'allowed_tools', 'all')
+        
+        if allowed_tools == 'ipython_only':
+            # Only enable IPython tool
+            agent_config.codeact_enable_jupyter = True
+            agent_config.codeact_enable_llm_editor = False
+            # We'll override the tools after agent initialization
+            metadata.override_tools = [codeact_function_calling.IPythonTool, codeact_function_calling.FinishTool]
+            logger.info(f"Configured CodeActAgent for MATH500 benchmark with IPython tool only")
+        elif allowed_tools == 'bash_only':
+            # Only enable Bash tool
+            agent_config.codeact_enable_jupyter = False
+            agent_config.codeact_enable_llm_editor = False
+            # We'll override the tools after agent initialization
+            metadata.override_tools = [codeact_function_calling.CmdRunTool, codeact_function_calling.FinishTool]
+            logger.info(f"Configured CodeActAgent for MATH500 benchmark with Bash tool only")
+        elif allowed_tools == 'no_editor':
+            # Enable Bash and IPython but no editor
+            agent_config.codeact_enable_jupyter = True
+            agent_config.codeact_enable_llm_editor = False
+            # We'll override the tools after agent initialization
+            metadata.override_tools = [
+                codeact_function_calling.CmdRunTool, 
+                codeact_function_calling.IPythonTool, 
+                codeact_function_calling.FinishTool
+            ]
+            logger.info(f"Configured CodeActAgent for MATH500 benchmark with Bash and IPython tools (no editor)")
+        else:  # 'all' or any other value
+            # Enable all tools except browsing
+            agent_config.codeact_enable_jupyter = True
+            agent_config.codeact_enable_llm_editor = False
+            # No need to override tools
+            metadata.override_tools = None
+            logger.info(f"Configured CodeActAgent for MATH500 benchmark with all tools (except browsing)")
 
     # copy 'draft_editor' config if exists
     config_copy = copy.deepcopy(config)
@@ -174,15 +210,29 @@ def process_instance(
     runtime: Runtime = create_runtime(config)
     call_async_from_sync(runtime.connect)
 
-    # Here's how you can run the agent (similar to the `main` function) and get the final task state
-    state: State | None = asyncio.run(
-        run_controller(
+    # Get the override_tools from metadata if it exists
+    override_tools = getattr(metadata, 'override_tools', None)
+    
+    # Define a custom run_controller function that overrides the tools if needed
+    async def custom_run_controller():
+        # Run the controller normally
+        state = await run_controller(
             config=config,
             initial_user_action=MessageAction(content=instruction),
             runtime=runtime,
             fake_user_response_fn=FAKE_RESPONSES[metadata.agent_class],
         )
-    )
+        
+        # If we need to override the tools, do it after the agent is initialized
+        if override_tools is not None and hasattr(state, 'agent') and hasattr(state.agent, 'tools'):
+            # Override the tools
+            state.agent.tools = override_tools
+            logger.info(f"Overriding agent tools with: {[tool.function.name for tool in override_tools]}")
+        
+        return state
+    
+    # Here's how you can run the agent (similar to the `main` function) and get the final task state
+    state: State | None = asyncio.run(custom_run_controller())
     if state is None:
         raise ValueError('State should not be None.')
 
@@ -242,8 +292,22 @@ def process_instance(
     return output
 
 
+# Custom argument parser for MATH500 benchmark
+def parse_math500_arguments():
+    parser = get_parser()
+    
+    # Add custom argument for allowed tools
+    parser.add_argument(
+        '--allowed-tools',
+        type=str,
+        default='all',
+        help='Comma-separated list of allowed tools for the agent. Options: all, ipython_only, bash_only, no_editor',
+    )
+    
+    return parser.parse_args()
+
 if __name__ == '__main__':
-    args = parse_arguments()
+    args = parse_math500_arguments()
     
     # Load the MATH-500 dataset
     dataset = load_dataset('HuggingFaceH4/MATH-500')
@@ -281,6 +345,9 @@ if __name__ == '__main__':
         args.eval_output_dir,
         details=agent_details,
     )
+    
+    # Add the allowed_tools parameter to the metadata
+    metadata.allowed_tools = args.allowed_tools
     output_file = os.path.join(metadata.eval_output_dir, 'output.jsonl')
 
     # Parse dataset IDs if provided

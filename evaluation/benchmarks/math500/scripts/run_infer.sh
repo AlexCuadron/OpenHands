@@ -9,7 +9,8 @@ AGENT=$3
 EVAL_LIMIT=$4
 NUM_WORKERS=$5
 EVAL_IDS=$6
-RUN_EVALUATION=$7  # New parameter to run evaluation after benchmark
+RUN_EVALUATION=$7  # Parameter to run evaluation after benchmark
+ALLOWED_TOOLS=${8:-"all"}  # Parameter to specify allowed tools, default is "all"
 
 # Function to clean up temporary files
 cleanup() {
@@ -64,7 +65,11 @@ COMMAND="export PYTHONPATH=evaluation/benchmarks/math500:\$PYTHONPATH && poetry 
   --max-iterations 30 \
   --eval-num-workers $NUM_WORKERS \
   --eval-note $EVAL_NOTE \
+  --allowed-tools $ALLOWED_TOOLS \
   $CONFIG_FILE_ARG"
+
+# Print the allowed tools
+echo "ALLOWED_TOOLS: $ALLOWED_TOOLS"
 
 if [ -n "$EVAL_LIMIT" ]; then
   echo "EVAL_LIMIT: $EVAL_LIMIT"
