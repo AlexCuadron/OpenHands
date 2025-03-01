@@ -79,9 +79,15 @@ def plot_results(summary, output_dir):
 
 def main():
     parser = argparse.ArgumentParser(description='Analyze AIME2024 benchmark results')
-    parser.add_argument('--results-file', type=str, required=True, help='Path to the results JSONL file')
-    parser.add_argument('--output-dir', type=str, default='./evaluation/results/aime2024/analysis', help='Directory to save analysis results')
+    parser.add_argument('results_file', type=str, help='Path to the results JSONL file')
+    parser.add_argument('--output-dir', type=str, default=None, help='Directory to save analysis results')
     args = parser.parse_args()
+    
+    # Set default output directory if not provided
+    if args.output_dir is None:
+        output_dir = os.path.join(os.path.dirname(args.results_file), 'analysis')
+    else:
+        output_dir = args.output_dir
     
     # Load results
     results = load_results(args.results_file)
@@ -95,10 +101,10 @@ def main():
     print(f"Overall accuracy: {summary['accuracy']:.2%}")
     
     # Plot results
-    plot_results(summary, args.output_dir)
+    plot_results(summary, output_dir)
     
     # Save summary to file
-    with open(os.path.join(args.output_dir, 'summary.json'), 'w') as f:
+    with open(os.path.join(output_dir, 'summary.json'), 'w') as f:
         json.dump(summary, f, indent=2)
     
     # Create a detailed DataFrame
@@ -114,9 +120,9 @@ def main():
         })
     
     df = pd.DataFrame(details)
-    df.to_csv(os.path.join(args.output_dir, 'detailed_results.csv'), index=False)
+    df.to_csv(os.path.join(output_dir, 'detailed_results.csv'), index=False)
     
-    print(f"Analysis saved to {args.output_dir}")
+    print(f"Analysis saved to {output_dir}")
 
 
 if __name__ == '__main__':

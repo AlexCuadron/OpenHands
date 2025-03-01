@@ -16,9 +16,7 @@ The AIME is a challenging mathematics competition for high school students in th
 
 ### Running a Single Example
 
-To run a single example from the AIME2024 benchmark, you can use either positional or named arguments:
-
-#### Using positional arguments (compatible with MATH500):
+To run a single example from the AIME2024 benchmark:
 
 ```bash
 cd OpenHands
@@ -27,38 +25,22 @@ bash evaluation/benchmarks/aime2024/scripts/run_example.sh togetherDeepseek HEAD
 
 This format follows: `<llm-config> <commit-hash> <agent-cls> <eval-limit> <num-workers> <eval-ids> <run-evaluation> <allowed-tools>`
 
-#### Using named arguments:
-
-```bash
-cd OpenHands
-bash evaluation/benchmarks/aime2024/scripts/run_example.sh --llm-config <your-llm-config>
-```
-
 This will run the first problem in the dataset.
 
 ### Running the Full Benchmark
 
 To run the full AIME2024 benchmark:
 
-#### Using positional arguments (compatible with MATH500):
-
 ```bash
 cd OpenHands
 bash evaluation/benchmarks/aime2024/scripts/run_infer.sh togetherDeepseek HEAD CodeActAgent 500 20 "" eval ipython_only
-```
-
-#### Using named arguments:
-
-```bash
-cd OpenHands
-bash evaluation/benchmarks/aime2024/scripts/run_infer.sh --llm-config <your-llm-config> --eval-num-workers <num-workers>
 ```
 
 ### Options
 
 #### Positional Arguments:
 1. `MODEL_CONFIG`: LLM configuration to use (required)
-2. `COMMIT_HASH`: Not used but kept for compatibility with MATH500
+2. `COMMIT_HASH`: Git commit hash to use (optional)
 3. `AGENT`: Agent class to use (default: "CodeActAgent")
 4. `EVAL_LIMIT`: Limit the number of examples to evaluate (default: 0 for full benchmark, 1 for example)
 5. `NUM_WORKERS`: Number of workers for parallel evaluation (default: 1)
@@ -66,23 +48,18 @@ bash evaluation/benchmarks/aime2024/scripts/run_infer.sh --llm-config <your-llm-
 7. `RUN_EVALUATION`: Set to "eval" to run evaluation after benchmark
 8. `ALLOWED_TOOLS`: Tools allowed for the agent (default: "all")
 
-#### Named Arguments:
-- `--agent-cls`: Agent class to use (default: "CodeActAgent")
-- `--llm-config`: LLM configuration to use (required)
-- `--max-iterations`: Maximum number of iterations (default: 20)
-- `--eval-note`: Note for the evaluation (default: "aime2024_benchmark")
-- `--eval-output-dir`: Output directory (default: "./evaluation/results/aime2024")
-- `--eval-num-workers`: Number of workers for parallel evaluation (default: 1)
-- `--eval-n-limit`: Limit the number of examples to evaluate (default: 0, meaning all)
-- `--eval-ids`: Comma-separated list of example IDs to evaluate (default: "", meaning all)
-- `--allowed-tools`: Tools allowed for the agent (default: "all", options: "all", "ipython_only", "bash_only", "no_editor")
-
 ## Analyzing Results
 
 To analyze the results of the benchmark:
 
 ```bash
-python evaluation/benchmarks/aime2024/scripts/analyze_results.py --results-file <path-to-results-jsonl> --output-dir <output-directory>
+poetry run python evaluation/benchmarks/aime2024/scripts/analyze_results.py <path-to-results-jsonl> --output-dir <output-directory>
+```
+
+Or simply include "eval" in your command to automatically run the analysis after the benchmark:
+
+```bash
+bash evaluation/benchmarks/aime2024/scripts/run_infer.sh togetherDeepseek HEAD CodeActAgent 500 20 "" eval ipython_only
 ```
 
 This will generate:
