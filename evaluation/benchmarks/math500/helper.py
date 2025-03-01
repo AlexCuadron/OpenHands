@@ -10,7 +10,8 @@ IMPORTANT:
 - Use tools to discover new information that might not be obvious from initial reasoning
 - Break down complex problems into smaller parts that can be verified with tools
 - The following libraries are pre-installed and ready to use:
-  * sympy, numpy, scipy, matplotlib, pandas (with common imports already set up)
+  * sympy, numpy, scipy, matplotlib, pandas and other scientific libraries
+  * You can import them directly, e.g., `import sympy as sp` or `import numpy as np`
 - When you have the final answer, please provide it in the format: "The answer is [your answer]"
 - You can also use LaTeX notation with \\boxed{} to highlight your final answer
 

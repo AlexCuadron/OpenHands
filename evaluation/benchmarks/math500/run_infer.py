@@ -46,27 +46,15 @@ def get_config(
     metadata: EvalMetadata,
 ) -> AppConfig:
     sandbox_config = get_default_sandbox_config_for_eval()
-    sandbox_config.base_container_image = 'python:3.11-bookworm'
     
-    # Add extra dependencies to install math libraries
-    runtime_extra_deps = """
-# Install math libraries
-pip install --no-cache-dir sympy numpy scipy matplotlib pandas
-
-# Create IPython startup directory and script
-mkdir -p /root/.ipython/profile_default/startup
-cat > /root/.ipython/profile_default/startup/00-math-imports.py << 'EOF'
-import numpy as np
-import sympy as sp
-from sympy import symbols, solve, Eq, simplify, expand, factor, integrate, diff
-from sympy import sin, cos, tan, exp, log, pi, oo
-from sympy.abc import x, y, z, a, b, c, n, m
-from sympy import Matrix, Rational
-import matplotlib.pyplot as plt
-print("Math libraries pre-loaded: numpy, sympy, scipy, matplotlib")
-EOF
-"""
-    sandbox_config.runtime_extra_deps = runtime_extra_deps
+    # Use a base image that already has scientific libraries installed
+    sandbox_config.base_container_image = 'jupyter/scipy-notebook:latest'
+    
+    # Add environment variables to ensure the agent knows about the pre-installed libraries
+    sandbox_config.runtime_startup_env_vars = {
+        "PYTHONPATH": "/opt/conda/lib/python3.10/site-packages",
+        "MATH_LIBRARIES_INSTALLED": "true"
+    }
     
     config = AppConfig(
         default_agent=metadata.agent_class,
