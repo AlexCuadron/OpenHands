@@ -39,11 +39,30 @@ The `solution` parameter is a more general way to provide a solution or answer t
 
 ## Usage
 
+### Docker Image
+
+The benchmark uses a custom Docker image with pre-installed math libraries (numpy, matplotlib, sympy, scipy). The image will be built automatically when you run the benchmark for the first time.
+
+To build the Docker image manually:
+
+```bash
+cd /workspace/OpenHands
+./evaluation/benchmarks/math500/scripts/build_docker.sh
+```
+
+### Running the Benchmark
+
 To run the benchmark:
 
 ```bash
 cd /workspace/OpenHands
-python -m evaluation.benchmarks.math500.run_infer --llm_config <llm_config> --agent_cls CodeActAgent --eval_output_dir <output_dir>
+python -m evaluation.benchmarks.math500.run_infer --llm-config <llm_config> --agent-cls CodeActAgent --eval-output-dir <output_dir>
+```
+
+Or use the provided script:
+
+```bash
+./evaluation/benchmarks/math500/scripts/run_infer.sh <model_config> HEAD CodeActAgent <eval_limit> <num_workers>
 ```
 
 ## Metrics

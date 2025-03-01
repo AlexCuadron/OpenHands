@@ -58,7 +58,39 @@ def get_config(
         The agent configuration
     """
     sandbox_config = get_default_sandbox_config_for_eval()
-    sandbox_config.base_container_image = 'python:3.11-bookworm'
+    
+    # Use a custom Docker image with math libraries pre-installed
+    # If the image doesn't exist, it will be built from the Dockerfile
+    math500_image = "openhands-math500:latest"
+    
+    # Check if the image exists, if not build it
+    import subprocess
+    try:
+        # Check if the image exists
+        result = subprocess.run(
+            ["docker", "image", "inspect", math500_image], 
+            capture_output=True, 
+            text=True
+        )
+        if result.returncode != 0:
+            # Image doesn't exist, build it
+            dockerfile_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), 
+                "Dockerfile"
+            )
+            build_dir = os.path.dirname(dockerfile_path)
+            subprocess.run(
+                ["docker", "build", "-t", math500_image, build_dir],
+                check=True
+            )
+            logger.info(f"Built Docker image {math500_image} for MATH-500 benchmark")
+        else:
+            logger.info(f"Using existing Docker image {math500_image} for MATH-500 benchmark")
+    except Exception as e:
+        logger.warning(f"Failed to build custom Docker image: {e}. Using default image.")
+        math500_image = 'python:3.11-bookworm'
+    
+    sandbox_config.base_container_image = math500_image
     config = AppConfig(
         default_agent=metadata.agent_class,
         run_as_openhands=False,
@@ -94,27 +126,13 @@ def initialize_runtime(
     """Initialize the runtime for the agent.
 
     This function is called before the runtime is used to run the agent.
+    The Docker image already has the necessary packages installed.
     """
     logger.info(f"\n{'-' * 50} BEGIN Runtime Initialization Fn {'-' * 50}\n")
-    obs: CmdOutputObservation
-
-    # Set up workspace
-    action = CmdRunAction(command='mkdir -p /workspace')
-    logger.info(action, extra={'msg_type': 'ACTION'})
-    obs = runtime.run_action(action)
-    assert obs.exit_code == 0
-
-    action = CmdRunAction(command='cd /workspace')
-    logger.info(action, extra={'msg_type': 'ACTION'})
-    obs = runtime.run_action(action)
-    assert obs.exit_code == 0
-
-    # Install necessary packages
-    action = CmdRunAction(command='pip install numpy matplotlib sympy scipy')
-    logger.info(action, extra={'msg_type': 'ACTION'})
-    obs = runtime.run_action(action)
-    assert obs.exit_code == 0
-
+    
+    # No initialization needed as the Docker image already has everything set up
+    logger.info("Using pre-built Docker image with math libraries installed")
+    
     logger.info(f"\n{'-' * 50} END Runtime Initialization Fn {'-' * 50}\n")
 
 
