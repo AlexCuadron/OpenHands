@@ -16,7 +16,31 @@ The dataset is available on Hugging Face: [HuggingFaceH4/MATH-500](https://huggi
 
 ## Running the Benchmark
 
-To run the benchmark, use the following command:
+### Using the run_infer.sh script
+
+The easiest way to run the benchmark is using the provided script:
+
+```bash
+./evaluation/benchmarks/math500/scripts/run_infer.sh <model_config> <commit_hash> <agent_class> <eval_limit> <num_workers> [eval_ids] [eval]
+```
+
+For example:
+```bash
+./evaluation/benchmarks/math500/scripts/run_infer.sh openai/gpt-4-turbo HEAD CodeActAgent 5 1
+```
+
+Parameters:
+- `model_config`: The LLM configuration to use (e.g., "openai/gpt-4-turbo")
+- `commit_hash`: The Git commit hash to use (or "HEAD" for the current commit)
+- `agent_class`: The agent class to use (default: "CodeActAgent")
+- `eval_limit`: Limit evaluation to the first n instances
+- `num_workers`: Number of parallel workers for evaluation
+- `eval_ids` (optional): Comma-separated list of instance IDs to evaluate
+- `eval` (optional): Add this parameter to run evaluation after the benchmark
+
+### Manual Execution
+
+Alternatively, you can run the benchmark directly:
 
 ```bash
 python -m evaluation.benchmarks.math500.run_infer --llm_config <llm_config> --agent_cls CodeActAgent --max_iterations 10 --eval_output_dir <output_dir>
