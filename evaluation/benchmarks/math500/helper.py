@@ -15,7 +15,7 @@ When you have the final answer, use the `finish` tool with your answer as a para
 finish(answer="42")
 ```
 
-Make sure your answer matches the expected format in the problem statement. Your answer will be extracted from the `answer` parameter and used for evaluation.
+Make sure your answer matches the expected format in the problem statement.
 """
 
 # Different instruction suffixes for different agent types

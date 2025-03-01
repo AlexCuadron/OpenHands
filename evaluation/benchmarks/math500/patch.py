@@ -56,11 +56,10 @@ def patch_codeact_agent():
         for action in actions:
             self.pending_actions.append(action)
             
-        # If no actions were added to the pending_actions, create a default message action
+        # If no actions were added to the pending_actions, create a default finish action
         if not self.pending_actions:
-            from openhands.events.action import MessageAction
-            content = "I'm thinking about how to solve this problem. Let me try using the Python interpreter."
-            return MessageAction(content=content)
+            from openhands.events.action import AgentFinishAction
+            return AgentFinishAction()
             
         return self.pending_actions.popleft()
 
