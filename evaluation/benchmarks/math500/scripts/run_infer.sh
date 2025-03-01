@@ -45,21 +45,21 @@ echo "MODEL_CONFIG: $MODEL_CONFIG"
 EVAL_NOTE=$OPENHANDS_VERSION
 
 COMMAND="poetry run python -m evaluation.benchmarks.math500.run_infer \
-  --agent_cls $AGENT \
-  --llm_config $MODEL_CONFIG \
-  --max_iterations 30 \
-  --eval_num_workers $NUM_WORKERS \
-  --eval_note $EVAL_NOTE"
+  --agent-cls $AGENT \
+  --llm-config $MODEL_CONFIG \
+  --max-iterations 30 \
+  --eval-num-workers $NUM_WORKERS \
+  --eval-note $EVAL_NOTE"
 
 if [ -n "$EVAL_LIMIT" ]; then
   echo "EVAL_LIMIT: $EVAL_LIMIT"
-  COMMAND="$COMMAND --eval_n_limit $EVAL_LIMIT"
+  COMMAND="$COMMAND --eval-n-limit $EVAL_LIMIT"
 fi
 
 # Only pass eval-ids if it's not "eval" (which is a special parameter for evaluation mode)
 if [ -n "$EVAL_IDS" ] && [ "$EVAL_IDS" != "eval" ]; then
   echo "EVAL_IDS: $EVAL_IDS"
-  COMMAND="$COMMAND --eval_ids $EVAL_IDS"
+  COMMAND="$COMMAND --eval-ids $EVAL_IDS"
 fi
 
 # Run the command
@@ -98,12 +98,12 @@ if [ "$RUN_EVALUATION" = "eval" ]; then
 
   if [ -f "$OUTPUT_FILE" ]; then
     echo "Evaluating results in: $OUTPUT_FILE"
-    poetry run python evaluation/benchmarks/math500/scripts/summarize_results.py --output_file "$OUTPUT_FILE"
+    poetry run python evaluation/benchmarks/math500/scripts/summarize_results.py --output-file "$OUTPUT_FILE"
 
     # Save the evaluation results
     EVAL_RESULTS_FILE="$OUTPUT_DIR/evaluation_results.txt"
     echo "Saving evaluation results to: $EVAL_RESULTS_FILE"
-    poetry run python evaluation/benchmarks/math500/scripts/summarize_results.py --output_file "$OUTPUT_FILE" > "$EVAL_RESULTS_FILE"
+    poetry run python evaluation/benchmarks/math500/scripts/summarize_results.py --output-file "$OUTPUT_FILE" > "$EVAL_RESULTS_FILE"
 
     echo ""
     echo "Evaluation complete. Results saved to: $EVAL_RESULTS_FILE"
