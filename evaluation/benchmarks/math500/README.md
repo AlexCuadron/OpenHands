@@ -40,7 +40,12 @@ Parameters:
 - `eval_ids` (optional): Comma-separated list of instance IDs to evaluate
 - `eval` (optional): Add this parameter to run evaluation after the benchmark
 
-Note: When using `togetherDeepseek`, you'll need to set your API key in the script or as an environment variable.
+Note: When using `togetherDeepseek`, you'll need to set your API key as an environment variable:
+
+```bash
+export TOGETHER_API_KEY="your-api-key-here"
+./evaluation/benchmarks/math500/scripts/run_infer.sh togetherDeepseek HEAD CodeActAgent 5 1
+```
 
 ### Manual Execution
 
