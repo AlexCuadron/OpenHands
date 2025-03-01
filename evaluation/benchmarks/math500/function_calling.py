@@ -25,6 +25,7 @@ from openhands.events.action import (
     CmdRunAction,
 )
 from openhands.events.event import FileEditSource
+from openhands.events.tool import ToolCallMetadata
 
 # Custom finish tool description that accepts an optional answer parameter
 _FINISH_DESCRIPTION = """Finish the interaction when the task is complete OR if the assistant cannot proceed further with the task.
@@ -107,29 +108,59 @@ def response_to_actions(response: ModelResponse) -> List[Action]:
             # Handle our custom finish tool
             if tool_call.function.name == 'finish':
                 answer = arguments.get('answer', '')
+                # Create tool call metadata
+                tool_metadata = ToolCallMetadata(
+                    tool_name=tool_call.function.name,
+                    tool_call_id=tool_call.id,
+                    tool_args=arguments
+                )
                 # Use both the solution parameter and the outputs dictionary for backward compatibility
-                action = AgentFinishAction(outputs={'answer': answer}, solution=answer)
+                action = AgentFinishAction(
+                    outputs={'answer': answer}, 
+                    solution=answer,
+                    tool_call_metadata=tool_metadata
+                )
             else:
                 # Instead of creating a ModelResponse, directly call the original function
                 # with the current tool_call
                 try:
+                    # Create tool call metadata
+                    tool_metadata = ToolCallMetadata(
+                        tool_name=tool_call.function.name,
+                        tool_call_id=tool_call.id,
+                        tool_args=arguments
+                    )
+                    
                     # Create a simple action based on the tool call
                     if tool_call.function.name == 'execute_bash':
                         command = arguments.get('command', '')
                         is_input = arguments.get('is_input', 'false') == 'true'
-                        action = CmdRunAction(command=command, is_input=is_input)
+                        action = CmdRunAction(
+                            command=command, 
+                            is_input=is_input,
+                            tool_call_metadata=tool_metadata
+                        )
                     elif tool_call.function.name == 'execute_ipython_cell':
                         from openhands.events.action import IPythonRunCellAction
                         code = arguments.get('code', '')
-                        action = IPythonRunCellAction(code=code)
+                        action = IPythonRunCellAction(
+                            code=code,
+                            tool_call_metadata=tool_metadata
+                        )
                     elif tool_call.function.name == 'web_read':
                         from openhands.events.action import BrowseURLAction
                         url = arguments.get('url', '')
-                        action = BrowseURLAction(url=url)
+                        action = BrowseURLAction(
+                            url=url,
+                            tool_call_metadata=tool_metadata
+                        )
                     elif tool_call.function.name == 'browser':
                         from openhands.events.action import BrowseInteractiveAction
                         code = arguments.get('code', '')
-                        action = BrowseInteractiveAction(code=code)
+                        action = BrowseInteractiveAction(
+                            code=code,
+                            tool_call_metadata=tool_metadata
+                        )
                     elif tool_call.function.name == 'str_replace_editor':
                         from openhands.events.action import FileEditAction
                         command = arguments.get('command', '')
@@ -143,31 +174,39 @@ def response_to_actions(response: ModelResponse) -> List[Action]:
                         # Create appropriate action based on command
                         if command == 'view':
                             from openhands.events.action import FileReadAction
-                            action = FileReadAction(path=path, view_range=view_range)
+                            action = FileReadAction(
+                                path=path, 
+                                view_range=view_range,
+                                tool_call_metadata=tool_metadata
+                            )
                         elif command == 'create':
                             action = FileEditAction(
                                 path=path,
                                 content=file_text,
-                                source=FileEditSource.CREATE
+                                source=FileEditSource.CREATE,
+                                tool_call_metadata=tool_metadata
                             )
                         elif command == 'str_replace':
                             action = FileEditAction(
                                 path=path,
                                 old_str=old_str,
                                 new_str=new_str,
-                                source=FileEditSource.STR_REPLACE
+                                source=FileEditSource.STR_REPLACE,
+                                tool_call_metadata=tool_metadata
                             )
                         elif command == 'insert':
                             action = FileEditAction(
                                 path=path,
                                 insert_line=insert_line,
                                 new_str=new_str,
-                                source=FileEditSource.INSERT
+                                source=FileEditSource.INSERT,
+                                tool_call_metadata=tool_metadata
                             )
                         elif command == 'undo_edit':
                             action = FileEditAction(
                                 path=path,
-                                source=FileEditSource.UNDO
+                                source=FileEditSource.UNDO,
+                                tool_call_metadata=tool_metadata
                             )
                         else:
                             # Skip unknown commands
