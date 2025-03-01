@@ -3,23 +3,18 @@
 import asyncio
 import copy
 import os
-import re
-from typing import Any, Dict, Optional
+from typing import Optional
 
 import pandas as pd
 from datasets import load_dataset
 
-from evaluation.benchmarks.math500.function_calling import FinishWithAnswerTool
-from evaluation.benchmarks.math500.patch import patch_codeact_agent
-
-# Patch the CodeActAgent to use our custom finish tool
-patch_codeact_agent()
 from evaluation.benchmarks.math500.helper import (
     FAKE_RESPONSES,
     INST_SUFFIXES,
     INSTRUCTIONS_ADDENDUM,
     compare_answers,
 )
+from evaluation.benchmarks.math500.patch import patch_codeact_agent
 from evaluation.utils.shared import (
     EvalMetadata,
     EvalOutput,
@@ -45,17 +40,20 @@ from openhands.events.observation import CmdOutputObservation
 from openhands.runtime.base import Runtime
 from openhands.utils.async_utils import call_async_from_sync
 
+# Patch the CodeActAgent to use our custom finish tool
+patch_codeact_agent()
+
 
 def get_config(
     instance: pd.Series,
     metadata: EvalMetadata,
 ) -> AppConfig:
     """Get the configuration for the agent.
-    
+
     Args:
         instance: The instance to evaluate
         metadata: The evaluation metadata
-        
+
     Returns:
         The agent configuration
     """
@@ -73,9 +71,7 @@ def get_config(
     )
     # Update llm_config to enable completions logging
     llm_config = update_llm_config_for_completions_logging(
-        metadata.llm_config,
-        metadata.eval_output_dir,
-        str(instance.instance_id)
+        metadata.llm_config, metadata.eval_output_dir, str(instance.instance_id)
     )
     config.set_llm_config(llm_config)
     agent_config = config.get_agent_config(metadata.agent_class)
@@ -86,7 +82,7 @@ def get_config(
     load_from_toml(config_copy)
     if 'draft_editor' in config_copy.llms:
         config.set_llm_config(config_copy.llms['draft_editor'], 'draft_editor')
-    
+
     # No need to monkey patch anymore, we're using our custom agent
 
     return config
@@ -124,18 +120,23 @@ def initialize_runtime(
 
 def extract_answer_from_history(state: State) -> Optional[str]:
     """Extract the answer from the agent's history.
-    
+
     Args:
         state: The agent's state
-        
+
     Returns:
         The extracted answer, or None if no answer was found
     """
-    # First, look for a finish action with an answer in the outputs
+    # First, look for a finish action with a solution
     for event in reversed(state.history):
-        if isinstance(event, AgentFinishAction) and 'answer' in event.outputs:
-            return event.outputs['answer']
-    
+        if isinstance(event, AgentFinishAction):
+            # Check for solution parameter first
+            if event.solution:
+                return event.solution
+            # Fall back to outputs dictionary for backward compatibility
+            elif 'answer' in event.outputs:
+                return event.outputs['answer']
+
     # If no finish action with an answer was found, return None
     return None
 
@@ -146,12 +147,12 @@ def process_instance(
     reset_logger: bool = True,
 ) -> EvalOutput:
     """Process a single instance of the benchmark.
-    
+
     Args:
         instance: The instance to evaluate
         metadata: The evaluation metadata
         reset_logger: Whether to reset the logger
-        
+
     Returns:
         The evaluation output
     """
@@ -172,9 +173,9 @@ def process_instance(
 
     # Prepare instruction
     logger.info(instance)
-    instruction = f"Problem: {instance.problem}\n\n"
+    instruction = f'Problem: {instance.problem}\n\n'
     instruction += INSTRUCTIONS_ADDENDUM
-    
+
     # Add agent-specific instructions
     instruction += INST_SUFFIXES[metadata.agent_class]
 
@@ -205,12 +206,12 @@ def process_instance(
 
     # Extract the answer from the agent's history
     predicted_answer = extract_answer_from_history(state)
-    
+
     # Compare with the ground truth
     is_correct = False
     if predicted_answer:
         is_correct = compare_answers(predicted_answer, instance.answer)
-    
+
     test_result = {
         'predicted_answer': predicted_answer,
         'reference_answer': instance.answer,
@@ -234,24 +235,26 @@ def process_instance(
         error=state.last_error if state and state.last_error else None,
         test_result=test_result,
     )
-    
+
     # Close the runtime
     runtime.close()
-    
+
     return output
 
 
 if __name__ == '__main__':
     args = parse_arguments()
-    
+
     # Load the MATH-500 dataset
     dataset = load_dataset('HuggingFaceH4/MATH-500')
     math500_df = dataset['test'].to_pandas()
-    
+
     # Add instance_id column if it doesn't exist
     if 'instance_id' not in math500_df.columns:
-        math500_df['instance_id'] = math500_df['unique_id'].apply(lambda x: x.replace('/', '_').replace('.json', ''))
-    
+        math500_df['instance_id'] = math500_df['unique_id'].apply(
+            lambda x: x.replace('/', '_').replace('.json', '')
+        )
+
     llm_config = None
     if args.llm_config:
         llm_config = get_llm_config_arg(args.llm_config)
@@ -263,16 +266,16 @@ if __name__ == '__main__':
 
     # Create details dictionary with agent configuration
     agent_details = {
-        "agent_config": {
-            "codeact_enable_jupyter": True,  # Enable Jupyter for Python interpreter
-            "codeact_enable_browsing": False,
-            "codeact_enable_llm_editor": False,
+        'agent_config': {
+            'codeact_enable_jupyter': True,  # Enable Jupyter for Python interpreter
+            'codeact_enable_browsing': False,
+            'codeact_enable_llm_editor': False,
         }
     }
-    
+
     # Use the CodeActAgent with our patched finish tool
     agent_cls = 'CodeActAgent'
-    
+
     metadata = make_metadata(
         llm_config,
         'MATH500',

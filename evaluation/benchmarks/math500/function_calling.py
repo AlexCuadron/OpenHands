@@ -1,7 +1,7 @@
 """Custom function calling implementation for the MATH-500 benchmark."""
 
 import json
-from typing import Any, Dict, List
+from typing import List
 
 from litellm import (
     ChatCompletionToolParam,
@@ -10,11 +10,13 @@ from litellm import (
 )
 
 from openhands.agenthub.codeact_agent.function_calling import (
+    BrowserTool,
     CmdRunTool,
     IPythonTool,
     StrReplaceEditorTool,
     WebReadTool,
-    BrowserTool,
+)
+from openhands.agenthub.codeact_agent.function_calling import (
     response_to_actions as original_response_to_actions,
 )
 from openhands.events.action import Action, AgentFinishAction
@@ -45,6 +47,7 @@ FinishWithAnswerTool = ChatCompletionToolParam(
     ),
 )
 
+
 # Override the get_tools function to use our custom finish tool
 def get_tools(
     codeact_enable_browsing: bool = False,
@@ -52,7 +55,7 @@ def get_tools(
     codeact_enable_jupyter: bool = False,
 ) -> List[ChatCompletionToolParam]:
     """Get the tools for the CodeActAgent.
-    
+
     This is a custom version of the get_tools function that uses our custom finish tool.
     """
     tools = [CmdRunTool, FinishWithAnswerTool]
@@ -65,10 +68,11 @@ def get_tools(
         tools.append(StrReplaceEditorTool)
     return tools
 
+
 # Override the response_to_actions function to handle our custom finish tool
 def response_to_actions(response: ModelResponse) -> List[Action]:
     """Convert a model response to a list of actions.
-    
+
     This is a custom version of the response_to_actions function that handles our custom finish tool.
     """
     actions: List[Action] = []
@@ -94,23 +98,32 @@ def response_to_actions(response: ModelResponse) -> List[Action]:
                 raise RuntimeError(
                     f'Failed to parse tool call arguments: {tool_call.function.arguments}'
                 ) from e
-                
+
             # Handle our custom finish tool
             if tool_call.function.name == 'finish':
                 answer = arguments.get('answer', '')
-                action = AgentFinishAction(outputs={'answer': answer})
+                # Use both the solution parameter and the outputs dictionary for backward compatibility
+                action = AgentFinishAction(outputs={'answer': answer}, solution=answer)
             else:
                 # Use the original response_to_actions function for other tools
                 # This is a hack, but it should work for our purposes
                 temp_response = ModelResponse(
                     id=response.id,
                     choices=[
-                        type('Choice', (), {
-                            'message': type('Message', (), {
-                                'tool_calls': [tool_call],
-                                'content': assistant_msg.content,
-                            }),
-                        })
+                        type(
+                            'Choice',
+                            (),
+                            {
+                                'message': type(
+                                    'Message',
+                                    (),
+                                    {
+                                        'tool_calls': [tool_call],
+                                        'content': assistant_msg.content,
+                                    },
+                                ),
+                            },
+                        )
                     ],
                 )
                 temp_actions = original_response_to_actions(temp_response)
@@ -118,11 +131,11 @@ def response_to_actions(response: ModelResponse) -> List[Action]:
                     action = temp_actions[0]
                 else:
                     continue
-                
+
             # Add thought to the action
             if thought and hasattr(action, 'thought'):
                 action.thought = thought
-                
+
             actions.append(action)
     else:
         # If no tool calls, create a message action
@@ -130,5 +143,5 @@ def response_to_actions(response: ModelResponse) -> List[Action]:
         if isinstance(content, list):
             content = ''.join(msg['text'] for msg in content if msg['type'] == 'text')
         actions.append(Action.from_content(content))
-        
+
     return actions

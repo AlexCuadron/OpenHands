@@ -31,6 +31,12 @@ The benchmark evaluates the LLM's ability to solve math problems with the help o
 
 The evaluation compares the LLM's answer with the ground truth answer provided in the dataset.
 
+### Implementation Details
+
+This benchmark uses a custom implementation of the `finish` tool that accepts an optional `answer` parameter. The answer is stored in both the `outputs` dictionary and the new `solution` parameter of the `AgentFinishAction` class.
+
+The `solution` parameter is a more general way to provide a solution or answer to a task, and it can be used by other benchmarks as well. The benchmark will first check for a solution in the `solution` parameter, and if not found, it will fall back to the `outputs` dictionary for backward compatibility.
+
 ## Usage
 
 To run the benchmark:

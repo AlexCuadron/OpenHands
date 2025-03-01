@@ -41,11 +41,13 @@ class AgentFinishAction(Action):
         outputs (dict): The outputs of the agent, for instance "content".
         thought (str): The agent's explanation of its actions.
         action (str): The action type, namely ActionType.FINISH.
+        solution (str, optional): The solution or answer to the task, if applicable.
     """
 
     outputs: dict[str, Any] = field(default_factory=dict)
     thought: str = ''
     action: str = ActionType.FINISH
+    solution: str = ''
 
     @property
     def message(self) -> str:
