@@ -60,6 +60,7 @@ The OpenHands evaluation harness supports a wide variety of benchmarks across [s
 - AiderBench: [`evaluation/benchmarks/aider_bench`](./benchmarks/aider_bench/)
 - Commit0: [`evaluation/benchmarks/commit0_bench`](./benchmarks/commit0_bench/)
 - DiscoveryBench: [`evaluation/benchmarks/discoverybench`](./benchmarks/discoverybench/)
+- APPS: [`evaluation/benchmarks/apps`](./benchmarks/apps/)
 
 ### Web Browsing
 
@@ -76,6 +77,10 @@ The OpenHands evaluation harness supports a wide variety of benchmarks across [s
 - Entity deduction Arena (EDA): [`evaluation/benchmarks/EDA`](./benchmarks/EDA)
 - ProofWriter: [`evaluation/benchmarks/logic_reasoning`](./benchmarks/logic_reasoning)
 - ScienceAgentBench: [`evaluation/benchmarks/scienceagentbench`](./benchmarks/scienceagentbench)
+- MATH: [`evaluation/benchmarks/math`](./benchmarks/math/)
+- HotpotQA: [`evaluation/benchmarks/hotpotqa`](./benchmarks/hotpotqa/)
+- WikiTableQuestion: [`evaluation/benchmarks/wiki_table_question`](./benchmarks/wiki_table_question/)
+- AlfWorld: [`evaluation/benchmarks/alfworld`](./benchmarks/alfworld/)
 
 ### Real World
 
