@@ -22,40 +22,8 @@ cleanup() {
 # Register the cleanup function to be called on exit
 trap cleanup EXIT
 
-# Create a temporary config file for the model if it's togetherDeepseek
-if [ "$MODEL_CONFIG" = "togetherDeepseek" ]; then
-  # Create a temporary directory for the config file
-  TMP_DIR=$(mktemp -d)
-  CONFIG_FILE="$TMP_DIR/config.toml"
-  
-  echo "Created temporary config file: $CONFIG_FILE"
-  
-  # Copy the existing config.toml file
-  cp config.toml "$CONFIG_FILE"
-  
-  # Get the API key from environment variable or use a default
-  TOGETHER_API_KEY=${TOGETHER_API_KEY:-""}
-  
-  # Add the togetherDeepseek configuration to the config file
-  cat >> "$CONFIG_FILE" << EOF
-
-[llm.togetherDeepseek]
-model = "deepseek-coder/deepseek-coder-33b-instruct"
-api_key = "$TOGETHER_API_KEY"
-base_url = "https://api.together.xyz/v1"
-temperature = 0.0
-EOF
-  
-  echo "Added togetherDeepseek configuration to config file"
-  
-  # Set the MODEL_CONFIG to use the new configuration
-  MODEL_CONFIG="togetherDeepseek"
-  
-  # Set the CONFIG_FILE_ARG to use the temporary config file
-  CONFIG_FILE_ARG="--config-file $CONFIG_FILE"
-else
-  CONFIG_FILE_ARG=""
-fi
+# No temporary config file creation - we'll use the existing config.toml
+CONFIG_FILE_ARG=""
 
 # Special case: if the 7th parameter is "eval", set RUN_EVALUATION to "eval"
 if [ "$RUN_EVALUATION" = "eval" ]; then
