@@ -48,15 +48,25 @@ def get_config(
     sandbox_config = get_default_sandbox_config_for_eval()
     sandbox_config.base_container_image = 'python:3.11-bookworm'
     
-    # Add setup commands to install math libraries
-    setup_commands = [
-        "pip install --no-cache-dir sympy numpy scipy matplotlib pandas",
-        # Create directory for IPython startup files
-        "mkdir -p /root/.ipython/profile_default/startup",
-        # Create a simple startup script that imports common math libraries
-        "echo 'import numpy as np\nimport sympy as sp\nfrom sympy import symbols, solve, Eq, simplify, expand, factor, integrate, diff\nfrom sympy import sin, cos, tan, exp, log, pi, oo\nfrom sympy.abc import x, y, z, a, b, c, n, m\nfrom sympy import Matrix, Rational\nimport matplotlib.pyplot as plt\nprint(\"Math libraries pre-loaded: numpy, sympy, scipy, matplotlib\")' > /root/.ipython/profile_default/startup/00-math-imports.py"
-    ]
-    sandbox_config.setup_commands = setup_commands
+    # Add extra dependencies to install math libraries
+    runtime_extra_deps = """
+# Install math libraries
+pip install --no-cache-dir sympy numpy scipy matplotlib pandas
+
+# Create IPython startup directory and script
+mkdir -p /root/.ipython/profile_default/startup
+cat > /root/.ipython/profile_default/startup/00-math-imports.py << 'EOF'
+import numpy as np
+import sympy as sp
+from sympy import symbols, solve, Eq, simplify, expand, factor, integrate, diff
+from sympy import sin, cos, tan, exp, log, pi, oo
+from sympy.abc import x, y, z, a, b, c, n, m
+from sympy import Matrix, Rational
+import matplotlib.pyplot as plt
+print("Math libraries pre-loaded: numpy, sympy, scipy, matplotlib")
+EOF
+"""
+    sandbox_config.runtime_extra_deps = runtime_extra_deps
     
     config = AppConfig(
         default_agent=metadata.agent_class,
