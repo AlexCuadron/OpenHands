@@ -143,14 +143,23 @@ def get_config(
 
 def extract_answer(text: str) -> Optional[str]:
     """Extract the answer from the agent's response."""
+    if not text:
+        return None
+    
     # Look for answer in solution tags
     solution_pattern = r'<solution>(.*?)</solution>'
     solution_match = re.search(solution_pattern, text, re.DOTALL)
     if solution_match:
         return solution_match.group(1).strip()
     
+    # Look for boxed answers (common in LaTeX)
+    boxed_pattern = r'\\boxed{([^{}]*)}'
+    boxed_match = re.search(boxed_pattern, text, re.DOTALL)
+    if boxed_match:
+        return boxed_match.group(1).strip()
+    
     # Look for "The answer is" pattern
-    answer_pattern = r'[Tt]he\s+answer\s+is\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)]+)'
+    answer_pattern = r'[Tt]he\s+(?:final\s+)?answer\s+is\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)]+)'
     answer_match = re.search(answer_pattern, text, re.DOTALL)
     if answer_match:
         return answer_match.group(1).strip()
@@ -161,28 +170,79 @@ def extract_answer(text: str) -> Optional[str]:
     if therefore_match:
         return therefore_match.group(1).strip()
     
+    # Look for "Our answer is" pattern
+    our_answer_pattern = r'[Oo]ur\s+answer\s+is\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)]+)'
+    our_answer_match = re.search(our_answer_pattern, text, re.DOTALL)
+    if our_answer_match:
+        return our_answer_match.group(1).strip()
+    
+    # Look for "We get" pattern (common in math solutions)
+    we_get_pattern = r'[Ww]e\s+get\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)=]+)'
+    we_get_match = re.search(we_get_pattern, text, re.DOTALL)
+    if we_get_match:
+        return we_get_match.group(1).strip()
+    
+    # Look for a standalone number at the end of the text (common in AIME problems)
+    final_number_pattern = r'(?:^|\n|\.)[\s\t]*(\d+)[\s\t]*$'
+    final_number_match = re.search(final_number_pattern, text)
+    if final_number_match:
+        return final_number_match.group(1).strip()
+    
     return None
 
 
 def normalize_answer(answer: str) -> str:
     """Normalize the answer for comparison."""
-    # Remove LaTeX commands and whitespace
-    answer = re.sub(r'\\boxed{|}\\left\(|\\right\)', '', answer)
+    if answer is None:
+        return ""
+    
+    # Remove LaTeX commands
+    answer = re.sub(r'\\boxed{(.*?)}', r'\1', answer)  # Extract content from \boxed{}
+    answer = re.sub(r'\\left\(|\\right\)', '', answer)
     answer = re.sub(r'\\', '', answer)
+    
+    # Remove all whitespace
     answer = re.sub(r'\s+', '', answer)
+    
+    # Remove any text that's not part of the actual answer
+    answer = re.sub(r'[Tt]he(final)?answeris', '', answer)
+    answer = re.sub(r'[Tt]herefore,?', '', answer)
+    
+    # Handle common mathematical notations
+    answer = re.sub(r'[{}()\[\]]', '', answer)  # Remove brackets
+    
+    # For AIME problems, we typically want just the number
+    # Try to extract just the number if it's the last thing in the string
+    number_match = re.search(r'(\d+)$', answer)
+    if number_match:
+        return number_match.group(1)
+    
     return answer
 
 
 def check_answer_correctness(predicted: str, reference: str) -> bool:
     """Check if the predicted answer matches the reference answer."""
     if predicted is None:
+        logger.warning("Predicted answer is None")
         return False
     
     # Normalize both answers
     predicted_norm = normalize_answer(predicted)
     reference_norm = normalize_answer(reference)
     
-    return predicted_norm == reference_norm
+    # Log the normalized answers for debugging
+    logger.info(f"Normalized predicted answer: '{predicted_norm}'")
+    logger.info(f"Normalized reference answer: '{reference_norm}'")
+    
+    # Check if they match
+    is_correct = predicted_norm == reference_norm
+    
+    if is_correct:
+        logger.info("✓ Answer is correct!")
+    else:
+        logger.warning("✗ Answer is incorrect")
+    
+    return is_correct
 
 
 def process_instance(
@@ -260,16 +320,30 @@ def process_instance(
     )
     
     if finish_action and hasattr(finish_action, 'solution') and finish_action.solution:
+        # The solution attribute is available and not empty
         predicted_answer = finish_action.solution
+        logger.info(f"Found solution in finish action: {predicted_answer}")
     else:
-        # Extract from the last message from the agent
-        last_message = next(
-            (event.message for event in reversed(state.history) 
-             if hasattr(event, 'message') and event.message),
-            None
-        )
-        if last_message:
-            predicted_answer = extract_answer(last_message)
+        # Try to extract from the outputs dictionary if available
+        if finish_action and hasattr(finish_action, 'outputs') and finish_action.outputs:
+            if 'solution' in finish_action.outputs:
+                predicted_answer = finish_action.outputs['solution']
+                logger.info(f"Found solution in finish action outputs: {predicted_answer}")
+        
+        # If still no answer, extract from the last message from the agent
+        if predicted_answer is None:
+            last_message = next(
+                (event.message for event in reversed(state.history) 
+                 if hasattr(event, 'message') and event.message),
+                None
+            )
+            if last_message:
+                extracted = extract_answer(last_message)
+                if extracted:
+                    predicted_answer = extracted
+                    logger.info(f"Extracted answer from last message: {predicted_answer}")
+                else:
+                    logger.warning(f"Could not extract answer from last message: {last_message[:100]}...")
     
     # Check if the answer is correct
     is_correct = check_answer_correctness(predicted_answer, instance.answer)
