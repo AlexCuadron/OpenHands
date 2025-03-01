@@ -26,17 +26,21 @@ The easiest way to run the benchmark is using the provided script:
 
 For example:
 ```bash
-./evaluation/benchmarks/math500/scripts/run_infer.sh openai/gpt-4-turbo HEAD CodeActAgent 5 1
+./evaluation/benchmarks/math500/scripts/run_infer.sh togetherDeepseek HEAD CodeActAgent 5 1
 ```
 
 Parameters:
-- `model_config`: The LLM configuration to use (e.g., "openai/gpt-4-turbo")
+- `model_config`: The LLM configuration to use. Special values:
+  - `togetherDeepseek`: Uses the deepseek-coder model from Together.ai
+  - `llm`: Uses the default LLM configuration from config.toml
 - `commit_hash`: The Git commit hash to use (or "HEAD" for the current commit)
 - `agent_class`: The agent class to use (default: "CodeActAgent")
 - `eval_limit`: Limit evaluation to the first n instances
 - `num_workers`: Number of parallel workers for evaluation
 - `eval_ids` (optional): Comma-separated list of instance IDs to evaluate
 - `eval` (optional): Add this parameter to run evaluation after the benchmark
+
+Note: When using `togetherDeepseek`, you'll need to set your API key in the script or as an environment variable.
 
 ### Manual Execution
 
