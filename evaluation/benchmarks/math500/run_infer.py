@@ -6,6 +6,10 @@ from typing import Any, Optional
 
 import pandas as pd
 from datasets import load_dataset
+import openhands.agenthub.codeact_agent.function_calling as codeact_function_calling
+from openhands.agenthub.codeact_agent.codeact_agent import CodeActAgent
+from openhands.llm.llm import LLM
+from openhands.core.config import AgentConfig
 
 from evaluation.benchmarks.math500.helper import (
     FAKE_RESPONSES,
@@ -35,6 +39,15 @@ from openhands.core.main import create_runtime, run_controller
 from openhands.events.action import AgentFinishAction, MessageAction
 from openhands.runtime.base import Runtime
 from openhands.utils.async_utils import call_async_from_sync
+
+
+# Custom CodeActAgent for MATH500 that only uses IPython tool
+class Math500CodeActAgent(CodeActAgent):
+    def __init__(self, llm: LLM, config: AgentConfig) -> None:
+        super().__init__(llm, config)
+        # Override the tools to only include IPythonTool and FinishTool
+        self.tools = [codeact_function_calling.IPythonTool, codeact_function_calling.FinishTool]
+        logger.info("Math500CodeActAgent initialized with only IPythonTool and FinishTool")
 
 
 def get_config(
@@ -72,13 +85,8 @@ def get_config(
     agent_config = config.get_agent_config(metadata.agent_class)
     agent_config.enable_prompt_extensions = False
     
-    # For MATH500 benchmark, configure the agent with the right tools
-    if metadata.agent_class == "CodeActAgent":
-        # Enable execute_bash, execute_ipython_cell, and str_replace_editor
-        agent_config.codeact_enable_browsing = False
-        agent_config.codeact_enable_llm_editor = False
-        agent_config.codeact_enable_jupyter = True
-        logger.info(f"Configured CodeActAgent for MATH500 benchmark with execute_bash, execute_ipython_cell, and str_replace_editor tools")
+    # For MATH500 benchmark, we'll use our custom Math500CodeActAgent
+    # No need to configure tools as they're hardcoded in the agent
 
     # copy 'draft_editor' config if exists
     config_copy = copy.deepcopy(config)
@@ -242,8 +250,19 @@ def process_instance(
     return output
 
 
+# Register our custom agent with OpenHands
+import openhands.agenthub
+
+# Register the Math500CodeActAgent
+openhands.agenthub.Agent.register("Math500CodeActAgent", Math500CodeActAgent)
+
 if __name__ == '__main__':
     args = parse_arguments()
+    
+    # If the agent class is CodeActAgent, use our Math500CodeActAgent instead
+    if args.agent_cls == "CodeActAgent":
+        args.agent_cls = "Math500CodeActAgent"
+        logger.info("Using Math500CodeActAgent instead of CodeActAgent for MATH500 benchmark")
     
     # Load the MATH-500 dataset
     dataset = load_dataset('HuggingFaceH4/MATH-500')
