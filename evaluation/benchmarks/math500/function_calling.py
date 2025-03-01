@@ -110,9 +110,10 @@ def response_to_actions(response: ModelResponse) -> List[Action]:
                 answer = arguments.get('answer', '')
                 # Create tool call metadata
                 tool_metadata = ToolCallMetadata(
-                    tool_name=tool_call.function.name,
+                    function_name=tool_call.function.name,
                     tool_call_id=tool_call.id,
-                    tool_args=arguments
+                    model_response=response,
+                    total_calls_in_response=len(assistant_msg.tool_calls)
                 )
                 # Use both the solution parameter and the outputs dictionary for backward compatibility
                 action = AgentFinishAction(
@@ -126,9 +127,10 @@ def response_to_actions(response: ModelResponse) -> List[Action]:
                 try:
                     # Create tool call metadata
                     tool_metadata = ToolCallMetadata(
-                        tool_name=tool_call.function.name,
+                        function_name=tool_call.function.name,
                         tool_call_id=tool_call.id,
-                        tool_args=arguments
+                        model_response=response,
+                        total_calls_in_response=len(assistant_msg.tool_calls)
                     )
                     
                     # Create a simple action based on the tool call
