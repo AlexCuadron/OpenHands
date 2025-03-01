@@ -352,8 +352,9 @@ def convert_fncall_messages_to_non_fncall_messages(
                         (
                             tool['type'] == 'function'
                             and tool['function']['name'] == 'execute_bash'
-                            and 'command'
-                            in tool['function']['parameters']['properties']
+                            and 'parameters' in tool['function']
+                            and 'properties' in tool['function']['parameters']
+                            and 'command' in tool['function']['parameters']['properties']
                         )
                         for tool in tools
                     )
@@ -361,13 +362,12 @@ def convert_fncall_messages_to_non_fncall_messages(
                         (
                             tool['type'] == 'function'
                             and tool['function']['name'] == 'str_replace_editor'
+                            and 'parameters' in tool['function']
+                            and 'properties' in tool['function']['parameters']
                             and 'path' in tool['function']['parameters']['properties']
-                            and 'file_text'
-                            in tool['function']['parameters']['properties']
-                            and 'old_str'
-                            in tool['function']['parameters']['properties']
-                            and 'new_str'
-                            in tool['function']['parameters']['properties']
+                            and 'file_text' in tool['function']['parameters']['properties']
+                            and 'old_str' in tool['function']['parameters']['properties']
+                            and 'new_str' in tool['function']['parameters']['properties']
                         )
                         for tool in tools
                     )
@@ -528,7 +528,10 @@ def _extract_and_validate_params(
                 pass
 
         # Enum check
-        if 'enum' in matching_tool['parameters']['properties'][param_name]:
+        if ('parameters' in matching_tool and 
+            'properties' in matching_tool['parameters'] and 
+            param_name in matching_tool['parameters']['properties'] and
+            'enum' in matching_tool['parameters']['properties'][param_name]):
             if (
                 param_value
                 not in matching_tool['parameters']['properties'][param_name]['enum']
