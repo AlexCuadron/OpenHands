@@ -16,7 +16,18 @@ The AIME is a challenging mathematics competition for high school students in th
 
 ### Running a Single Example
 
-To run a single example from the AIME2024 benchmark:
+To run a single example from the AIME2024 benchmark, you can use either positional or named arguments:
+
+#### Using positional arguments (compatible with MATH500):
+
+```bash
+cd OpenHands
+bash evaluation/benchmarks/aime2024/scripts/run_example.sh togetherDeepseek HEAD CodeActAgent 1 1 "0" "" ipython_only
+```
+
+This format follows: `<llm-config> <commit-hash> <agent-cls> <eval-limit> <num-workers> <eval-ids> <run-evaluation> <allowed-tools>`
+
+#### Using named arguments:
 
 ```bash
 cd OpenHands
@@ -29,6 +40,15 @@ This will run the first problem in the dataset.
 
 To run the full AIME2024 benchmark:
 
+#### Using positional arguments (compatible with MATH500):
+
+```bash
+cd OpenHands
+bash evaluation/benchmarks/aime2024/scripts/run_infer.sh togetherDeepseek HEAD CodeActAgent 500 20 "" eval ipython_only
+```
+
+#### Using named arguments:
+
 ```bash
 cd OpenHands
 bash evaluation/benchmarks/aime2024/scripts/run_infer.sh --llm-config <your-llm-config> --eval-num-workers <num-workers>
@@ -36,6 +56,17 @@ bash evaluation/benchmarks/aime2024/scripts/run_infer.sh --llm-config <your-llm-
 
 ### Options
 
+#### Positional Arguments:
+1. `MODEL_CONFIG`: LLM configuration to use (required)
+2. `COMMIT_HASH`: Not used but kept for compatibility with MATH500
+3. `AGENT`: Agent class to use (default: "CodeActAgent")
+4. `EVAL_LIMIT`: Limit the number of examples to evaluate (default: 0 for full benchmark, 1 for example)
+5. `NUM_WORKERS`: Number of workers for parallel evaluation (default: 1)
+6. `EVAL_IDS`: Comma-separated list of example IDs to evaluate (default: "" for full benchmark, "0" for example)
+7. `RUN_EVALUATION`: Set to "eval" to run evaluation after benchmark
+8. `ALLOWED_TOOLS`: Tools allowed for the agent (default: "all")
+
+#### Named Arguments:
 - `--agent-cls`: Agent class to use (default: "CodeActAgent")
 - `--llm-config`: LLM configuration to use (required)
 - `--max-iterations`: Maximum number of iterations (default: 20)
