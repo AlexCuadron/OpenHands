@@ -59,9 +59,25 @@ def get_config(
         metadata.eval_output_dir,
         str(instance.instance_id)
     )
+    
+    # Disable native tool calling for Together.ai models
+    if llm_config and (
+        llm_config.model.startswith("deepseek") or 
+        (llm_config.base_url and "together.xyz" in llm_config.base_url)
+    ):
+        llm_config.native_tool_calling = False
+        logger.info(f"Disabled native tool calling for model: {llm_config.model}")
+    
     config.set_llm_config(llm_config)
     agent_config = config.get_agent_config(metadata.agent_class)
     agent_config.enable_prompt_extensions = False
+    
+    # For MATH500 benchmark, only enable IPython tool and disable other tools
+    if metadata.agent_class == "CodeActAgent":
+        agent_config.codeact_enable_browsing = False
+        agent_config.codeact_enable_llm_editor = False
+        agent_config.codeact_enable_jupyter = True
+        logger.info(f"Configured CodeActAgent with only IPython tool enabled for MATH500 benchmark")
 
     # copy 'draft_editor' config if exists
     config_copy = copy.deepcopy(config)
