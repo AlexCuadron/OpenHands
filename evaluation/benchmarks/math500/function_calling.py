@@ -22,12 +22,9 @@ from openhands.agenthub.codeact_agent.function_calling import (
 from openhands.events.action import (
     Action,
     AgentFinishAction,
-    BrowserAction,
     CmdRunAction,
-    IPythonCellAction,
-    StrReplaceEditorAction,
-    WebReadAction,
 )
+from openhands.events.event import FileEditSource
 
 # Custom finish tool description that accepts an optional answer parameter
 _FINISH_DESCRIPTION = """Finish the interaction when the task is complete OR if the assistant cannot proceed further with the task.
@@ -122,15 +119,19 @@ def response_to_actions(response: ModelResponse) -> List[Action]:
                         is_input = arguments.get('is_input', 'false') == 'true'
                         action = CmdRunAction(command=command, is_input=is_input)
                     elif tool_call.function.name == 'execute_ipython_cell':
+                        from openhands.events.action import IPythonRunCellAction
                         code = arguments.get('code', '')
-                        action = IPythonCellAction(code=code)
+                        action = IPythonRunCellAction(code=code)
                     elif tool_call.function.name == 'web_read':
+                        from openhands.events.action import BrowseURLAction
                         url = arguments.get('url', '')
-                        action = WebReadAction(url=url)
+                        action = BrowseURLAction(url=url)
                     elif tool_call.function.name == 'browser':
+                        from openhands.events.action import BrowseInteractiveAction
                         code = arguments.get('code', '')
-                        action = BrowserAction(code=code)
+                        action = BrowseInteractiveAction(code=code)
                     elif tool_call.function.name == 'str_replace_editor':
+                        from openhands.events.action import FileEditAction
                         command = arguments.get('command', '')
                         path = arguments.get('path', '')
                         file_text = arguments.get('file_text', '')
@@ -138,15 +139,39 @@ def response_to_actions(response: ModelResponse) -> List[Action]:
                         new_str = arguments.get('new_str', '')
                         insert_line = arguments.get('insert_line', 0)
                         view_range = arguments.get('view_range', None)
-                        action = StrReplaceEditorAction(
-                            command=command,
-                            path=path,
-                            file_text=file_text,
-                            old_str=old_str,
-                            new_str=new_str,
-                            insert_line=insert_line,
-                            view_range=view_range
-                        )
+                        
+                        # Create appropriate action based on command
+                        if command == 'view':
+                            from openhands.events.action import FileReadAction
+                            action = FileReadAction(path=path, view_range=view_range)
+                        elif command == 'create':
+                            action = FileEditAction(
+                                path=path,
+                                content=file_text,
+                                source=FileEditSource.CREATE
+                            )
+                        elif command == 'str_replace':
+                            action = FileEditAction(
+                                path=path,
+                                old_str=old_str,
+                                new_str=new_str,
+                                source=FileEditSource.STR_REPLACE
+                            )
+                        elif command == 'insert':
+                            action = FileEditAction(
+                                path=path,
+                                insert_line=insert_line,
+                                new_str=new_str,
+                                source=FileEditSource.INSERT
+                            )
+                        elif command == 'undo_edit':
+                            action = FileEditAction(
+                                path=path,
+                                source=FileEditSource.UNDO
+                            )
+                        else:
+                            # Skip unknown commands
+                            continue
                     else:
                         # Skip unknown tools
                         continue
