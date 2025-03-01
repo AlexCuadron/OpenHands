@@ -40,11 +40,13 @@ class AgentFinishAction(Action):
     Attributes:
         outputs (dict): The outputs of the agent, for instance "content".
         thought (str): The agent's explanation of its actions.
+        solution (str): The solution to the problem (used in benchmarks like MATH-500).
         action (str): The action type, namely ActionType.FINISH.
     """
 
     outputs: dict[str, Any] = field(default_factory=dict)
     thought: str = ''
+    solution: str = ''
     action: str = ActionType.FINISH
 
     @property
