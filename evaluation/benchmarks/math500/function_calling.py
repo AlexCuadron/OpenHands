@@ -19,7 +19,15 @@ from openhands.agenthub.codeact_agent.function_calling import (
 from openhands.agenthub.codeact_agent.function_calling import (
     response_to_actions as original_response_to_actions,
 )
-from openhands.events.action import Action, AgentFinishAction
+from openhands.events.action import (
+    Action,
+    AgentFinishAction,
+    BrowserAction,
+    CmdRunAction,
+    IPythonCellAction,
+    StrReplaceEditorAction,
+    WebReadAction,
+)
 
 # Custom finish tool description that accepts an optional answer parameter
 _FINISH_DESCRIPTION = """Finish the interaction when the task is complete OR if the assistant cannot proceed further with the task.
@@ -105,31 +113,46 @@ def response_to_actions(response: ModelResponse) -> List[Action]:
                 # Use both the solution parameter and the outputs dictionary for backward compatibility
                 action = AgentFinishAction(outputs={'answer': answer}, solution=answer)
             else:
-                # Use the original response_to_actions function for other tools
-                # This is a hack, but it should work for our purposes
-                temp_response = ModelResponse(
-                    id=response.id,
-                    choices=[
-                        type(
-                            'Choice',
-                            (),
-                            {
-                                'message': type(
-                                    'Message',
-                                    (),
-                                    {
-                                        'tool_calls': [tool_call],
-                                        'content': assistant_msg.content,
-                                    },
-                                ),
-                            },
+                # Instead of creating a ModelResponse, directly call the original function
+                # with the current tool_call
+                try:
+                    # Create a simple action based on the tool call
+                    if tool_call.function.name == 'execute_bash':
+                        command = arguments.get('command', '')
+                        is_input = arguments.get('is_input', 'false') == 'true'
+                        action = CmdRunAction(command=command, is_input=is_input)
+                    elif tool_call.function.name == 'execute_ipython_cell':
+                        code = arguments.get('code', '')
+                        action = IPythonCellAction(code=code)
+                    elif tool_call.function.name == 'web_read':
+                        url = arguments.get('url', '')
+                        action = WebReadAction(url=url)
+                    elif tool_call.function.name == 'browser':
+                        code = arguments.get('code', '')
+                        action = BrowserAction(code=code)
+                    elif tool_call.function.name == 'str_replace_editor':
+                        command = arguments.get('command', '')
+                        path = arguments.get('path', '')
+                        file_text = arguments.get('file_text', '')
+                        old_str = arguments.get('old_str', '')
+                        new_str = arguments.get('new_str', '')
+                        insert_line = arguments.get('insert_line', 0)
+                        view_range = arguments.get('view_range', None)
+                        action = StrReplaceEditorAction(
+                            command=command,
+                            path=path,
+                            file_text=file_text,
+                            old_str=old_str,
+                            new_str=new_str,
+                            insert_line=insert_line,
+                            view_range=view_range
                         )
-                    ],
-                )
-                temp_actions = original_response_to_actions(temp_response)
-                if temp_actions:
-                    action = temp_actions[0]
-                else:
+                    else:
+                        # Skip unknown tools
+                        continue
+                except Exception as e:
+                    # If there's an error, skip this tool call
+                    print(f"Error processing tool call: {e}")
                     continue
 
             # Add thought to the action
