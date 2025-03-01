@@ -71,16 +71,10 @@ class CodeActAgent(Agent):
         self.reset()
 
         # Retrieve the enabled tools
-        # Check if we're in MATH500 mode (only IPython and Finish tools)
-        math500_mode = (not self.config.codeact_enable_browsing and 
-                        not self.config.codeact_enable_llm_editor and 
-                        self.config.codeact_enable_jupyter)
-        
         self.tools = codeact_function_calling.get_tools(
             codeact_enable_browsing=self.config.codeact_enable_browsing,
             codeact_enable_jupyter=self.config.codeact_enable_jupyter,
             codeact_enable_llm_editor=self.config.codeact_enable_llm_editor,
-            math500_mode=math500_mode,
         )
         logger.debug(
             f'TOOLS loaded for CodeActAgent: {json.dumps(self.tools, indent=2, ensure_ascii=False).replace("\\n", "\n")}'

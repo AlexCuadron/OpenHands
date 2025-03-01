@@ -72,12 +72,13 @@ def get_config(
     agent_config = config.get_agent_config(metadata.agent_class)
     agent_config.enable_prompt_extensions = False
     
-    # For MATH500 benchmark, only enable IPython tool and disable other tools
+    # For MATH500 benchmark, configure the agent with the right tools
     if metadata.agent_class == "CodeActAgent":
+        # Enable execute_bash, execute_ipython_cell, and str_replace_editor
         agent_config.codeact_enable_browsing = False
         agent_config.codeact_enable_llm_editor = False
         agent_config.codeact_enable_jupyter = True
-        logger.info(f"Configured CodeActAgent with only IPython tool enabled for MATH500 benchmark")
+        logger.info(f"Configured CodeActAgent for MATH500 benchmark with execute_bash, execute_ipython_cell, and str_replace_editor tools")
 
     # copy 'draft_editor' config if exists
     config_copy = copy.deepcopy(config)

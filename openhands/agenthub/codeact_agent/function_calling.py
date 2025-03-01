@@ -607,13 +607,7 @@ def get_tools(
     codeact_enable_browsing: bool = False,
     codeact_enable_llm_editor: bool = False,
     codeact_enable_jupyter: bool = False,
-    math500_mode: bool = False,
 ) -> list[ChatCompletionToolParam]:
-    if math500_mode:
-        # For MATH500 benchmark, only include IPythonTool and FinishTool
-        tools = [IPythonTool, FinishTool]
-        return tools
-    
     # Default behavior
     tools = [CmdRunTool, FinishTool]
     if codeact_enable_browsing:
