@@ -158,35 +158,70 @@ def extract_answer(text: str) -> Optional[str]:
     if boxed_match:
         return boxed_match.group(1).strip()
     
-    # Look for "The answer is" pattern
-    answer_pattern = r'[Tt]he\s+(?:final\s+)?answer\s+is\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)]+)'
-    answer_match = re.search(answer_pattern, text, re.DOTALL)
-    if answer_match:
-        return answer_match.group(1).strip()
+    # Look for "The answer is" pattern with variations
+    answer_patterns = [
+        r'[Tt]he\s+(?:final\s+)?answer\s+is\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)]+)',
+        r'[Tt]he\s+(?:final\s+)?answer\s+is\s*[:=]\s*([\d\w\s\.\-\+\/\*\^\{\}\\\(\)]+)',
+        r'[Tt]he\s+(?:final\s+)?answer\s*[:=]\s*([\d\w\s\.\-\+\/\*\^\{\}\\\(\)]+)',
+        r'[Aa]nswer\s*[:=]\s*([\d\w\s\.\-\+\/\*\^\{\}\\\(\)]+)',
+        r'[Aa]nswer\s+is\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)]+)',
+    ]
     
-    # Look for "Therefore" pattern
-    therefore_pattern = r'[Tt]herefore,?\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)=]+)'
-    therefore_match = re.search(therefore_pattern, text, re.DOTALL)
-    if therefore_match:
-        return therefore_match.group(1).strip()
+    for pattern in answer_patterns:
+        answer_match = re.search(pattern, text, re.DOTALL)
+        if answer_match:
+            return answer_match.group(1).strip()
     
-    # Look for "Our answer is" pattern
-    our_answer_pattern = r'[Oo]ur\s+answer\s+is\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)]+)'
-    our_answer_match = re.search(our_answer_pattern, text, re.DOTALL)
-    if our_answer_match:
-        return our_answer_match.group(1).strip()
+    # Look for "Therefore" pattern with variations
+    therefore_patterns = [
+        r'[Tt]herefore,?\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)=]+)',
+        r'[Tt]hus,?\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)=]+)',
+        r'[Ss]o,?\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)=]+)',
+        r'[Hh]ence,?\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)=]+)',
+    ]
     
-    # Look for "We get" pattern (common in math solutions)
-    we_get_pattern = r'[Ww]e\s+get\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)=]+)'
-    we_get_match = re.search(we_get_pattern, text, re.DOTALL)
-    if we_get_match:
-        return we_get_match.group(1).strip()
+    for pattern in therefore_patterns:
+        therefore_match = re.search(pattern, text, re.DOTALL)
+        if therefore_match:
+            return therefore_match.group(1).strip()
+    
+    # Look for "Our answer is" pattern and variations
+    our_answer_patterns = [
+        r'[Oo]ur\s+answer\s+is\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)]+)',
+        r'[Ww]e\s+get\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)=]+)',
+        r'[Ww]e\s+have\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)=]+)',
+        r'[Ww]e\s+find\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)=]+)',
+        r'[Tt]his\s+gives\s+us\s+([\d\w\s\.\-\+\/\*\^\{\}\\\(\)=]+)',
+    ]
+    
+    for pattern in our_answer_patterns:
+        our_answer_match = re.search(pattern, text, re.DOTALL)
+        if our_answer_match:
+            return our_answer_match.group(1).strip()
     
     # Look for a standalone number at the end of the text (common in AIME problems)
-    final_number_pattern = r'(?:^|\n|\.)[\s\t]*(\d+)[\s\t]*$'
-    final_number_match = re.search(final_number_pattern, text)
-    if final_number_match:
-        return final_number_match.group(1).strip()
+    final_number_patterns = [
+        r'(?:^|\n|\.)[\s\t]*(\d+)[\s\t]*$',
+        r'(?:^|\n|\.)[^\d]*(\d+)[^\d]*$',
+    ]
+    
+    for pattern in final_number_patterns:
+        final_number_match = re.search(pattern, text)
+        if final_number_match:
+            return final_number_match.group(1).strip()
+    
+    # Look for a number in the last line
+    last_line = text.strip().split('\n')[-1].strip()
+    if last_line.isdigit():
+        return last_line
+    
+    # Look for a number surrounded by special characters in the last few lines
+    last_few_lines = text.strip().split('\n')[-5:]
+    for line in last_few_lines:
+        # Look for numbers surrounded by special formatting
+        number_in_line = re.search(r'[^\d](\d+)[^\d]', line)
+        if number_in_line:
+            return number_in_line.group(1).strip()
     
     return None
 
@@ -195,6 +230,9 @@ def normalize_answer(answer: str) -> str:
     """Normalize the answer for comparison."""
     if answer is None:
         return ""
+    
+    # Convert to string if not already
+    answer = str(answer)
     
     # Remove LaTeX commands
     answer = re.sub(r'\\boxed{(.*?)}', r'\1', answer)  # Extract content from \boxed{}
@@ -207,13 +245,25 @@ def normalize_answer(answer: str) -> str:
     # Remove any text that's not part of the actual answer
     answer = re.sub(r'[Tt]he(final)?answeris', '', answer)
     answer = re.sub(r'[Tt]herefore,?', '', answer)
+    answer = re.sub(r'[Tt]hus,?', '', answer)
+    answer = re.sub(r'[Ss]o,?', '', answer)
+    answer = re.sub(r'[Hh]ence,?', '', answer)
+    answer = re.sub(r'[Oo]uranswer(is)?', '', answer)
+    answer = re.sub(r'[Ww]eget', '', answer)
+    answer = re.sub(r'[Ww]ehave', '', answer)
+    answer = re.sub(r'[Ww]efind', '', answer)
     
     # Handle common mathematical notations
     answer = re.sub(r'[{}()\[\]]', '', answer)  # Remove brackets
     
     # For AIME problems, we typically want just the number
-    # Try to extract just the number if it's the last thing in the string
+    # First, try to extract just the number if it's the last thing in the string
     number_match = re.search(r'(\d+)$', answer)
+    if number_match:
+        return number_match.group(1)
+    
+    # If that fails, try to extract any number from the string
+    number_match = re.search(r'(\d+)', answer)
     if number_match:
         return number_match.group(1)
     
@@ -319,31 +369,79 @@ def process_instance(
         None
     )
     
+    # Try multiple methods to extract the answer
+    possible_answers = []
+    
+    # Method 1: Extract from finish action solution attribute
     if finish_action and hasattr(finish_action, 'solution') and finish_action.solution:
         # The solution attribute is available and not empty
-        predicted_answer = finish_action.solution
-        logger.info(f"Found solution in finish action: {predicted_answer}")
-    else:
-        # Try to extract from the outputs dictionary if available
-        if finish_action and hasattr(finish_action, 'outputs') and finish_action.outputs:
-            if 'solution' in finish_action.outputs:
-                predicted_answer = finish_action.outputs['solution']
-                logger.info(f"Found solution in finish action outputs: {predicted_answer}")
+        possible_answers.append(finish_action.solution)
+        logger.info(f"Found solution in finish action: {finish_action.solution}")
+    
+    # Method 2: Extract from finish action outputs dictionary
+    if finish_action and hasattr(finish_action, 'outputs') and finish_action.outputs:
+        if 'solution' in finish_action.outputs:
+            possible_answers.append(finish_action.outputs['solution'])
+            logger.info(f"Found solution in finish action outputs: {finish_action.outputs['solution']}")
+    
+    # Method 3: Extract from finish action thought attribute
+    if finish_action and hasattr(finish_action, 'thought') and finish_action.thought:
+        extracted_from_thought = extract_answer(finish_action.thought)
+        if extracted_from_thought:
+            possible_answers.append(extracted_from_thought)
+            logger.info(f"Extracted answer from finish action thought: {extracted_from_thought}")
+    
+    # Method 4: Extract from the last message from the agent
+    last_message = next(
+        (event.message for event in reversed(state.history) 
+         if hasattr(event, 'message') and event.message),
+        None
+    )
+    if last_message:
+        extracted = extract_answer(last_message)
+        if extracted:
+            possible_answers.append(extracted)
+            logger.info(f"Extracted answer from last message: {extracted}")
+        else:
+            logger.warning(f"Could not extract answer from last message: {last_message[:100]}...")
+    
+    # Method 5: Look for any finish action in the history
+    for event in reversed(state.history):
+        if isinstance(event, dict) and event.get('action') == 'finish':
+            # Try to extract from solution field
+            if 'solution' in event and event['solution']:
+                possible_answers.append(event['solution'])
+                logger.info(f"Found solution in finish action dict: {event['solution']}")
+            
+            # Try to extract from outputs dictionary
+            if 'outputs' in event and isinstance(event['outputs'], dict) and 'solution' in event['outputs']:
+                possible_answers.append(event['outputs']['solution'])
+                logger.info(f"Found solution in finish action dict outputs: {event['outputs']['solution']}")
+            
+            # Try to extract from thought field
+            if 'thought' in event and event['thought']:
+                extracted_from_thought = extract_answer(event['thought'])
+                if extracted_from_thought:
+                    possible_answers.append(extracted_from_thought)
+                    logger.info(f"Extracted answer from finish action dict thought: {extracted_from_thought}")
+    
+    # Choose the best answer from the possible answers
+    if possible_answers:
+        # Normalize all possible answers
+        normalized_answers = [normalize_answer(ans) for ans in possible_answers]
+        logger.info(f"Normalized possible answers: {normalized_answers}")
         
-        # If still no answer, extract from the last message from the agent
-        if predicted_answer is None:
-            last_message = next(
-                (event.message for event in reversed(state.history) 
-                 if hasattr(event, 'message') and event.message),
-                None
-            )
-            if last_message:
-                extracted = extract_answer(last_message)
-                if extracted:
-                    predicted_answer = extracted
-                    logger.info(f"Extracted answer from last message: {predicted_answer}")
-                else:
-                    logger.warning(f"Could not extract answer from last message: {last_message[:100]}...")
+        # For AIME problems, prefer answers that are just numbers
+        numeric_answers = [ans for ans in normalized_answers if ans.isdigit()]
+        if numeric_answers:
+            predicted_answer = numeric_answers[0]
+            logger.info(f"Selected numeric answer: {predicted_answer}")
+        else:
+            predicted_answer = possible_answers[0]
+            logger.info(f"Selected first available answer: {predicted_answer}")
+    else:
+        predicted_answer = None
+        logger.warning("Could not find any answer in the agent's response")
     
     # Check if the answer is correct
     is_correct = check_answer_correctness(predicted_answer, instance.answer)
