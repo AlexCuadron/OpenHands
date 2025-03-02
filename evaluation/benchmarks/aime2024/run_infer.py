@@ -247,9 +247,18 @@ def normalize_answer(answer: str) -> str:
     # Convert to string if not already
     answer = str(answer)
 
+    # Store the original answer for debugging
+    original_answer = answer
+    
     # Remove LaTeX commands
     answer = re.sub(r'\\boxed{(.*?)}', r'\1', answer)  # Extract content from \boxed{}
     answer = re.sub(r'\\left\(|\\right\)', '', answer)
+    
+    # Check if the answer contains mathematical expressions like sqrt
+    has_math_expr = 'sqrt' in answer.lower() or '\\sqrt' in answer
+    
+    # Remove LaTeX backslashes but keep 'sqrt' intact
+    answer = re.sub(r'\\sqrt', 'sqrt', answer)
     answer = re.sub(r'\\', '', answer)
 
     # Remove all whitespace
@@ -268,8 +277,19 @@ def normalize_answer(answer: str) -> str:
 
     # Handle common mathematical notations
     answer = re.sub(r'[{}()\[\]]', '', answer)  # Remove brackets
-
-    # For AIME problems, we typically want just the number
+    
+    # Log the normalization process
+    logger.debug(f"Normalizing answer: '{original_answer}' -> '{answer}'")
+    
+    # If the answer has mathematical expressions, return the normalized form without extracting numbers
+    if has_math_expr:
+        return answer
+    
+    # For AIME problems with pure numbers, we typically want just the number
+    # Check if the answer is purely numeric
+    if re.match(r'^\d+$', answer):
+        return answer
+        
     # First, try to extract just the number if it's the last thing in the string
     number_match = re.search(r'(\d+)$', answer)
     if number_match:
