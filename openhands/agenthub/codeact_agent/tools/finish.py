@@ -13,6 +13,8 @@ The message should include:
 - Any follow-up questions if more information is needed
 
 The task_completed field should be set to True if you believed you have completed the task, and False otherwise.
+
+For benchmark problems (like MATH-500 or AIME), use the solution parameter to provide your final answer.
 """
 
 FinishTool = ChatCompletionToolParam(
@@ -32,6 +34,10 @@ FinishTool = ChatCompletionToolParam(
                     'type': 'string',
                     'enum': ['true', 'false', 'partial'],
                     'description': 'Whether you have completed the task.',
+                },
+                'solution': {
+                    'type': 'string',
+                    'description': 'The solution to the problem (used in benchmarks like MATH-500 or AIME).',
                 },
             },
         },
