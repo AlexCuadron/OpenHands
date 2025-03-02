@@ -43,6 +43,7 @@ Reminder:
 - Only call one function at a time
 - You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after.
 - If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls
+- You MUST use Python (execute_ipython_cell) at least once before using the finish function
 - For benchmark problems, ALWAYS use the finish function with the solution parameter when providing your final answer
 </IMPORTANT>
 """

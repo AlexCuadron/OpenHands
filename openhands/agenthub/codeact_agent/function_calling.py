@@ -24,6 +24,7 @@ from openhands.core.exceptions import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
 )
+from openhands.core.logger import openhands_logger as logger
 from openhands.events.action import (
     Action,
     AgentDelegateAction,
@@ -51,7 +52,7 @@ def combine_thought(action: Action, thought: str) -> Action:
     return action
 
 
-def response_to_actions(response: ModelResponse) -> list[Action]:
+def response_to_actions(response: ModelResponse, agent=None) -> list[Action]:
     actions: list[Action] = []
     assert len(response.choices) == 1, 'Only one choice is supported for now'
     choice = response.choices[0]
@@ -108,11 +109,22 @@ def response_to_actions(response: ModelResponse) -> list[Action]:
             # AgentFinishAction
             # ================================================
             elif tool_call.function.name == FinishTool['function']['name']:
-                action = AgentFinishAction(
-                    final_thought=arguments.get('message', ''),
-                    task_completed=arguments.get('task_completed', None),
-                    solution=arguments.get('solution', ''),
-                )
+                # Check if Python has been used (if agent is provided)
+                if agent and hasattr(agent, 'python_used') and not agent.python_used:
+                    # Python hasn't been used, create a message action instead
+                    error_message = "I need to use Python to solve this problem. Let me try using Python first."
+                    logger.warning("Blocked finish action because Python hasn't been used yet")
+                    action = MessageAction(
+                        content=error_message,
+                        wait_for_response=False,
+                    )
+                else:
+                    # Python has been used or agent not provided, proceed with finish
+                    action = AgentFinishAction(
+                        final_thought=arguments.get('message', ''),
+                        task_completed=arguments.get('task_completed', None),
+                        solution=arguments.get('solution', ''),
+                    )
 
             # ================================================
             # LLMBasedFileEditTool (LLM-based file editor, deprecated)

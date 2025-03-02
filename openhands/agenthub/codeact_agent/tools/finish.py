@@ -14,7 +14,9 @@ The message should include:
 
 The task_completed field should be set to True if you believed you have completed the task, and False otherwise.
 
-IMPORTANT: For benchmark problems (like MATH-500 or AIME), you MUST use the solution parameter to provide your final answer. The solution parameter should contain ONLY the answer value without any explanatory text.
+IMPORTANT: 
+1. You MUST use Python (execute_ipython_cell) at least once before using this tool. If you haven't used Python yet, you will not be allowed to finish.
+2. For benchmark problems (like MATH-500 or AIME), you MUST use the solution parameter to provide your final answer. The solution parameter should contain ONLY the answer value without any explanatory text.
 
 Examples of correct solution parameter usage:
 - If your answer is 125: set solution="125"

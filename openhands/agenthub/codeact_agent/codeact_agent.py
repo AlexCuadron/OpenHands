@@ -97,6 +97,8 @@ class CodeActAgent(Agent):
         """Resets the CodeAct Agent."""
         super().reset()
         self.pending_actions.clear()
+        # Track whether Python has been used
+        self.python_used = False
 
     def step(self, state: State) -> Action:
         """Performs one step using the CodeAct Agent.
@@ -128,8 +130,11 @@ class CodeActAgent(Agent):
         }
         params['tools'] = self.tools
         response = self.llm.completion(**params)
-        actions = codeact_function_calling.response_to_actions(response)
+        actions = codeact_function_calling.response_to_actions(response, self)
         for action in actions:
+            # Track if Python is being used
+            if isinstance(action, IPythonRunCellAction):
+                self.python_used = True
             self.pending_actions.append(action)
         return self.pending_actions.popleft()
 
