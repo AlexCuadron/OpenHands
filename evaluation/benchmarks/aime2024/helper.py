@@ -1,41 +1,45 @@
 from evaluation.utils.shared import codeact_user_response
 
 INSTRUCTIONS_ADDENDUM = """
-Please solve this problem using a programmatic approach with Python to verify your work.
+Please solve this problem by reasoning through each step and immediately verifying with Python code.
 
 PROBLEM-SOLVING APPROACH:
-1. ANALYZE: First, carefully analyze the problem and understand what's being asked
-2. PLAN: Develop a programmatic approach using Python to solve the problem
-3. IMPLEMENT: Write Python code to implement your solution
-4. VERIFY: Test your solution with examples and edge cases
+1. INSTALL: Start by installing necessary libraries: `%pip install sympy numpy scipy matplotlib`
+2. REASON & VERIFY: For each step in your reasoning:
+   - First, briefly explain your approach
+   - Immediately write Python code to verify your thinking
+   - Let the code execution results guide your next step
+3. ITERATE: Refine your approach based on code execution results
+4. CONFIRM: Verify your final answer with code before submitting
 
 IMPORTANT GUIDELINES:
-- Start by installing any libraries you need: `%pip install sympy numpy scipy matplotlib`
-- Use Python's mathematical libraries (sympy, numpy, etc.) to solve the problem efficiently
-- Implement your solution step-by-step, explaining your approach
-- Verify your solution with test cases or examples
-- If code execution reveals errors in your reasoning, acknowledge the mistake and correct your approach
-- Use tools to discover information that might contradict your initial assumptions
+- Verify EVERY step of your reasoning with Python code - don't rely on mental calculations
+- Use powerful libraries like sympy, numpy, and scipy to handle the mathematical heavy lifting
+- Write code early and often - don't wait until you've fully solved the problem
+- Use print statements liberally to see intermediate results
+- If code execution contradicts your reasoning, trust the code and adjust your approach
+- If your code produces errors, fix them immediately before proceeding
 - AIME problems typically have integer answers, so make sure your final answer is an integer
 - When you have the final answer, use the finish tool with your solution as the parameter
 
 EXAMPLE STRUCTURE:
 ```
-Problem Analysis:
-[Brief analysis of the problem]
+Step 1: Initial approach
+[Brief explanation of your first step]
+[Python code to verify this step]
 
-Solution Approach:
-[Explanation of your programmatic approach]
+Step 2: Refining the approach
+[Brief explanation based on previous results]
+[Python code to implement and verify this step]
 
-Implementation:
-[Python code implementing your solution]
-
-Verification:
-[Python code testing your solution]
+Step 3: Final solution
+[Brief explanation of your solution]
+[Python code to verify the final answer]
 
 Final answer: [Answer]
 ```
 
+Remember: Verify each step with code as you go. Don't trust your reasoning without code verification.
 When you have the final answer, use the finish tool with your solution as the parameter.
 """
 
@@ -90,14 +94,11 @@ def aime2024_user_response(state, **kwargs):
         if msg
     )
 
-    # Check if the agent is using a programmatic approach
-    has_programmatic_approach = any(
+    # Check if the agent is verifying with code
+    has_verified_with_code = any(
         (
-            'Solution Approach' in msg
-            or 'Implementation' in msg
-            or 'Verification' in msg
-            or 'programmatic' in msg
-            or 'algorithm' in msg
+            'execute_ipython_cell' in msg
+            or 'EXECUTION RESULT' in msg
         )
         for msg in recent_messages
         if msg
@@ -106,12 +107,12 @@ def aime2024_user_response(state, **kwargs):
     if module_error:
         # If there was a module error, prompt to install the missing library
         return 'It looks like you need to install some Python libraries. Use %pip install to install the libraries you need (e.g., %pip install sympy numpy scipy matplotlib).'
-    elif not has_programmatic_approach and len(recent_messages) >= 1:
-        # If the agent isn't using a programmatic approach, encourage it to do so
-        return 'Please develop a programmatic approach to solve this problem. Analyze the problem, plan your solution, implement it in Python, and verify your results with test cases.'
+    elif not has_verified_with_code and len(recent_messages) >= 1:
+        # If the agent hasn't verified with code, strongly encourage it
+        return 'Please verify your reasoning with Python code. Write code to check each step of your thinking - don\'t rely on mental calculations. Install libraries and write verification code for the steps you\'ve already taken.'
     elif not has_used_python and recent_messages:
-        # If the agent hasn't used Python in recent messages, encourage it to do so
-        return "Please use Python to implement your solution. Mathematical libraries like sympy and numpy can help you solve this problem efficiently. Don't rely solely on your own thinking - use code to verify your approach."
+        # If the agent hasn't used Python in recent messages, strongly encourage it
+        return "You need to verify each step with Python code. Don't proceed with your reasoning until you've confirmed your current step with code execution. Use sympy and numpy to verify your mathematical reasoning."
 
     # Otherwise, use the standard CodeActAgent response
     return codeact_user_response(state)
@@ -123,15 +124,17 @@ FAKE_RESPONSES = {
 
 INST_SUFFIXES: dict[str, str] = {
     'CodeActAgent': (
-        'IMPORTANT: Develop a programmatic approach to solve this problem using Python. '
-        'First, analyze the problem and understand what is being asked. '
-        'Then, plan your solution and implement it step-by-step in Python. '
-        'Install any libraries you need using %pip install (e.g., %pip install sympy numpy scipy matplotlib). '
-        'Use mathematical libraries like sympy and numpy to solve the problem efficiently. '
-        'Verify your solution with test cases or examples. '
-        'Do not trust your own reasoning without verification through code execution. '
-        'If code execution reveals errors in your thinking, acknowledge them and correct your approach. '
+        'IMPORTANT: Verify EVERY step of your reasoning with Python code as you go. '
+        'First, install necessary libraries: %pip install sympy numpy scipy matplotlib '
+        'For each step in your solution process: '
+        '1. Briefly explain your approach for that step '
+        '2. IMMEDIATELY write Python code to verify your thinking '
+        '3. Use the code execution results to guide your next step '
+        'Use mathematical libraries like sympy and numpy to verify calculations. '
+        'Do not proceed to the next step until you\'ve verified your current step with code. '
+        'If code execution contradicts your reasoning, trust the code and adjust your approach. '
         'When you have the final answer (verified with code), use the "finish" tool with your solution as the parameter.\n'
         'For example: finish(solution="42")\n'
+        'Remember: Don\'t trust your reasoning without code verification!\n'
     )
 }

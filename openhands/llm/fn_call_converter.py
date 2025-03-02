@@ -52,13 +52,13 @@ STOP_WORDS = ['</function']
 
 # NOTE: we need to make sure this example is always in-sync with the tool interface designed in openhands/agenthub/codeact_agent/function_calling.py
 IN_CONTEXT_LEARNING_EXAMPLE_PREFIX = """
-Here's a running example of how to solve a complex problem using a programmatic approach with Python.
+Here's a running example of how to solve a complex problem by verifying each step with Python code.
 
 --------------------- START OF EXAMPLE ---------------------
 
 USER: Problem: Find the number of ordered pairs of integers $(a, b)$ such that the sequence $[3, 4, 5, a, b, 30, 40, 50]$ is strictly increasing and no set of four (not necessarily consecutive) terms forms an arithmetic progression.
 
-ASSISTANT: I'll solve this problem using a programmatic approach with Python to verify my solution.
+ASSISTANT: I'll solve this problem by reasoning through each step and immediately verifying with Python code.
 
 First, I need to install the necessary libraries:
 
@@ -74,19 +74,11 @@ USER: EXECUTION RESULT of [execute_ipython_cell]:
 [Jupyter current working directory: /workspace]
 [Jupyter Python interpreter: /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/bin/python]
 
-ASSISTANT: Now I'll develop a programmatic approach to solve this problem:
+ASSISTANT: Now I'll solve this step-by-step, verifying each part with code:
 
-Problem Analysis:
-- We need to find ordered pairs (a,b) where the sequence [3,4,5,a,b,30,40,50] is strictly increasing
-- No set of four terms can form an arithmetic progression
-- This means we need to check all possible values of a and b that satisfy these constraints
-
-Solution Approach:
-1. Determine the constraints on a and b for the sequence to be strictly increasing
-2. Create a function to check if four numbers form an arithmetic progression
-3. Implement an algorithm to count valid pairs by checking all possible (a,b) combinations
-
-Let me start with implementing the first part of my solution:
+Step 1: Understand the constraints on a and b
+For the sequence [3,4,5,a,b,30,40,50] to be strictly increasing, we need 5 < a < b < 30.
+Let me verify this with code:
 
 <function=execute_ipython_cell>
 <parameter=code>
@@ -381,28 +373,27 @@ Therefore, the answer is 228.
 [Jupyter current working directory: /workspace]
 [Jupyter Python interpreter: /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/bin/python]
 
-ASSISTANT: I've solved this problem using a programmatic approach with Python:
+ASSISTANT: I've solved this problem by verifying each step with Python code:
 
-Problem Analysis:
-- For the sequence [3,4,5,a,b,30,40,50] to be strictly increasing, we need 5 < a < b < 30
-- We need to check that no set of four terms forms an arithmetic progression
-- This gives us constraints on the possible values of a and b
+Step 1: Understanding the constraints
+- I verified that for the sequence [3,4,5,a,b,30,40,50] to be strictly increasing, we need 5 < a < b < 30
+- My code confirmed there are 276 possible pairs (a,b) that satisfy this constraint
 
-Solution Implementation:
-- I created a function to check if four numbers form an arithmetic progression
-- I determined there are 276 possible pairs (a,b) that satisfy the strictly increasing constraint
-- I implemented an algorithm to check each pair against the arithmetic progression constraint
-- My code systematically tested all possible pairs and counted those that satisfy all constraints
+Step 2: Checking for arithmetic progressions
+- I wrote a function to check if four numbers form an arithmetic progression
+- I verified this function with test cases to ensure it works correctly
+- My code identified specific invalid pairs like (6,7) and (10,20) that create arithmetic progressions
 
-Verification:
-- I verified my solution with test cases for specific pairs
-- I analyzed the distribution of valid pairs across different values of a
-- My algorithm found that 48 pairs create arithmetic progressions, leaving 228 valid pairs
+Step 3: Counting valid pairs
+- I implemented an algorithm to check all possible pairs against the arithmetic progression constraint
+- My code systematically tested all 276 pairs and counted those that satisfy all constraints
+- I verified the results by checking the distribution of valid pairs across different values of a
+- The code confirmed that 48 pairs create arithmetic progressions, leaving 228 valid pairs
 
 The answer is 228.
 
 <function=finish>
-<parameter=message>I've solved this problem using a programmatic approach with Python to implement and verify my solution. The answer is 228.</parameter>
+<parameter=message>I've solved this problem by verifying each step with Python code. I confirmed my reasoning at every stage and the final answer is 228.</parameter>
 <parameter=task_completed>true</parameter>
 <parameter=solution>228</parameter>
 </function>
