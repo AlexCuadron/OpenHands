@@ -100,6 +100,10 @@ class CodeActAgent(Agent):
         self.pending_actions.clear()
         # Track whether Python has been used
         self.python_used = False
+        # Track whether the agent has tried to finish
+        self.has_tried_finish = False
+        # Store for saved finish arguments
+        self.saved_finish_args = None
 
     def step(self, state: State) -> Action:
         """Performs one step using the CodeAct Agent.

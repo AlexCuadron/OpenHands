@@ -398,6 +398,62 @@ The answer is 228.
 <parameter=solution>228</parameter>
 </function>
 
+USER: Have you verified your solution with code? Please run one final verification to confirm your answer is correct.
+
+ASSISTANT: You're right, I should run one final verification to confirm my answer. Let me do that:
+
+<function=execute_ipython_cell>
+<parameter=code>
+# Final verification
+import itertools
+
+def is_arithmetic_progression(numbers):
+    """Check if a set of numbers forms an arithmetic progression."""
+    sorted_nums = sorted(numbers)
+    diffs = [sorted_nums[i+1] - sorted_nums[i] for i in range(len(sorted_nums)-1)]
+    return all(d == diffs[0] for d in diffs)
+
+# Count valid pairs
+valid_count = 0
+total_pairs = 0
+
+# Check all possible pairs (a,b) where 5 < a < b < 30
+for a in range(6, 29):
+    for b in range(a + 1, 30):
+        sequence = [3, 4, 5, a, b, 30, 40, 50]
+        total_pairs += 1
+        
+        # Check if any 4 elements form an arithmetic progression
+        has_ap = False
+        for comb in itertools.combinations(sequence, 4):
+            if is_arithmetic_progression(comb):
+                has_ap = True
+                break
+                
+        if not has_ap:
+            valid_count += 1
+
+print(f"Total pairs checked: {total_pairs}")
+print(f"Valid pairs (no arithmetic progression): {valid_count}")
+print(f"Therefore, the answer is: {valid_count}")
+</parameter>
+</function>
+
+USER: EXECUTION RESULT of [execute_ipython_cell]:
+Total pairs checked: 276
+Valid pairs (no arithmetic progression): 228
+Therefore, the answer is: 228
+[Jupyter current working directory: /workspace]
+[Jupyter Python interpreter: /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/bin/python]
+
+ASSISTANT: Perfect! My final verification confirms that the answer is indeed 228.
+
+<function=finish>
+<parameter=message>I've solved this problem by verifying each step with Python code and performed a final verification to confirm my answer. The answer is 228.</parameter>
+<parameter=task_completed>true</parameter>
+<parameter=solution>228</parameter>
+</function>
+
 --------------------- END OF EXAMPLE ---------------------
 
 Do NOT assume the environment is the same as in the example above.

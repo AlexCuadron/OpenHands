@@ -118,8 +118,19 @@ def response_to_actions(response: ModelResponse, agent=None) -> list[Action]:
                         content=error_message,
                         wait_for_response=False,
                     )
+                # Check if this is the first time the agent is trying to finish
+                elif agent and hasattr(agent, 'has_tried_finish') and not agent.has_tried_finish:
+                    # First time trying to finish, ask for verification
+                    agent.has_tried_finish = True
+                    agent.saved_finish_args = arguments  # Save the arguments for later
+                    verification_message = "Have you verified your solution with code? Please run one final verification to confirm your answer is correct."
+                    logger.info("Asking for verification before accepting finish action")
+                    action = MessageAction(
+                        content=verification_message,
+                        wait_for_response=False,
+                    )
                 else:
-                    # Python has been used or agent not provided, proceed with finish
+                    # Python has been used and either verification was done or agent not provided, proceed with finish
                     action = AgentFinishAction(
                         final_thought=arguments.get('message', ''),
                         task_completed=arguments.get('task_completed', None),

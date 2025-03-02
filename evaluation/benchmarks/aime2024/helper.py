@@ -44,7 +44,7 @@ Final answer: [Answer]
 ```
 
 Remember: Verify each step with code as you go. Don't trust your reasoning without code verification.
-When you have the final answer, use the finish tool with your solution as the parameter.
+When you have the final answer, use the finish tool with your solution as the parameter. You'll be asked to run a final verification before your solution is accepted.
 """
 
 
@@ -145,6 +145,7 @@ INST_SUFFIXES: dict[str, str] = {
         'Do not proceed to the next step until you\'ve verified your current step with code. '
         'If code execution contradicts your reasoning, trust the code and adjust your approach. '
         'When you have the final answer (verified with code), use the "finish" tool with your solution as the parameter.\n'
+        'You\'ll be asked to run a final verification before your solution is accepted.\n'
         'For example: finish(solution="42")\n'
         'Remember: Don\'t trust your reasoning without code verification!\n'
     )
