@@ -388,6 +388,8 @@ ASSISTANT: I've solved this problem by breaking it down into sub-problems and us
 The answer is 228.
 
 <function=finish>
+<parameter=message>I've solved this problem by breaking it down into sub-problems and using Python to verify each step. The answer is 228.</parameter>
+<parameter=task_completed>true</parameter>
 <parameter=solution>228</parameter>
 </function>
 
