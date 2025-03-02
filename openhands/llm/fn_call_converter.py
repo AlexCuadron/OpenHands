@@ -38,13 +38,10 @@ multiple lines
 <IMPORTANT>
 Reminder:
 - Function calls MUST follow the specified format, start with <function= and end with </function>
-- ALWAYS include the closing </function> tag for EVERY function call
 - Required parameters MUST be specified
 - Only call one function at a time
 - You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after.
 - If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls
-- You MUST use Python (execute_ipython_cell) at least once before using the finish function
-- For benchmark problems, ALWAYS use the finish function with the solution parameter when providing your final answer
 </IMPORTANT>
 """
 
@@ -52,13 +49,13 @@ STOP_WORDS = ['</function']
 
 # NOTE: we need to make sure this example is always in-sync with the tool interface designed in openhands/agenthub/codeact_agent/function_calling.py
 IN_CONTEXT_LEARNING_EXAMPLE_PREFIX = """
-Here's a running example of how to solve a complex problem by verifying each step with Python code.
+Here's a running example of how to break down a complex problem into sub-problems and solve each one using tools.
 
 --------------------- START OF EXAMPLE ---------------------
 
 USER: Problem: Find the number of ordered pairs of integers $(a, b)$ such that the sequence $[3, 4, 5, a, b, 30, 40, 50]$ is strictly increasing and no set of four (not necessarily consecutive) terms forms an arithmetic progression.
 
-ASSISTANT: I'll solve this problem by reasoning through each step and immediately verifying with Python code.
+ASSISTANT: I'll solve this problem by breaking it down into sub-problems and using Python to verify each step.
 
 First, I need to install the necessary libraries:
 
@@ -74,11 +71,14 @@ USER: EXECUTION RESULT of [execute_ipython_cell]:
 [Jupyter current working directory: /workspace]
 [Jupyter Python interpreter: /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/bin/python]
 
-ASSISTANT: Now I'll solve this step-by-step, verifying each part with code:
+ASSISTANT: Now I'll break this problem into sub-problems:
 
-Step 1: Understand the constraints on a and b
-For the sequence [3,4,5,a,b,30,40,50] to be strictly increasing, we need 5 < a < b < 30.
-Let me verify this with code:
+Sub-problem 1: Understand the constraints on a and b for the sequence to be strictly increasing.
+Sub-problem 2: Define a function to check if four numbers form an arithmetic progression.
+Sub-problem 3: Identify specific invalid pairs (a,b) that create arithmetic progressions.
+Sub-problem 4: Count all valid pairs by checking each possible (a,b) combination.
+
+Let me start with sub-problem 1:
 
 <function=execute_ipython_cell>
 <parameter=code>
@@ -373,84 +373,21 @@ Therefore, the answer is 228.
 [Jupyter current working directory: /workspace]
 [Jupyter Python interpreter: /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/bin/python]
 
-ASSISTANT: I've solved this problem by verifying each step with Python code:
+ASSISTANT: I've solved this problem by breaking it down into sub-problems and using Python to verify each step:
 
-Step 1: Understanding the constraints
-- I verified that for the sequence [3,4,5,a,b,30,40,50] to be strictly increasing, we need 5 < a < b < 30
-- My code confirmed there are 276 possible pairs (a,b) that satisfy this constraint
+1. First, I identified the constraints: For the sequence [3,4,5,a,b,30,40,50] to be strictly increasing, we need 5 < a < b < 30.
 
-Step 2: Checking for arithmetic progressions
-- I wrote a function to check if four numbers form an arithmetic progression
-- I verified this function with test cases to ensure it works correctly
-- My code identified specific invalid pairs like (6,7) and (10,20) that create arithmetic progressions
+2. I created a function to check if four numbers form an arithmetic progression, which is when the differences between consecutive terms are equal.
 
-Step 3: Counting valid pairs
-- I implemented an algorithm to check all possible pairs against the arithmetic progression constraint
-- My code systematically tested all 276 pairs and counted those that satisfy all constraints
-- I verified the results by checking the distribution of valid pairs across different values of a
-- The code confirmed that 48 pairs create arithmetic progressions, leaving 228 valid pairs
+3. I identified specific invalid pairs like (6,7), (10,20), (12,21), and (7,9) that create arithmetic progressions.
+
+4. I systematically checked all 276 possible pairs and found that 48 of them create arithmetic progressions, leaving 228 valid pairs.
+
+5. I verified my answer by checking additional test cases and analyzing the distribution of valid pairs across different values of a.
 
 The answer is 228.
 
 <function=finish>
-<parameter=message>I've solved this problem by verifying each step with Python code. I confirmed my reasoning at every stage and the final answer is 228.</parameter>
-<parameter=task_completed>true</parameter>
-<parameter=solution>228</parameter>
-</function>
-
-USER: Have you verified your solution with code? Please run one final verification to confirm your answer is correct.
-
-ASSISTANT: You're right, I should run one final verification to confirm my answer. Let me do that:
-
-<function=execute_ipython_cell>
-<parameter=code>
-# Final verification
-import itertools
-
-def is_arithmetic_progression(numbers):
-    """Check if a set of numbers forms an arithmetic progression."""
-    sorted_nums = sorted(numbers)
-    diffs = [sorted_nums[i+1] - sorted_nums[i] for i in range(len(sorted_nums)-1)]
-    return all(d == diffs[0] for d in diffs)
-
-# Count valid pairs
-valid_count = 0
-total_pairs = 0
-
-# Check all possible pairs (a,b) where 5 < a < b < 30
-for a in range(6, 29):
-    for b in range(a + 1, 30):
-        sequence = [3, 4, 5, a, b, 30, 40, 50]
-        total_pairs += 1
-        
-        # Check if any 4 elements form an arithmetic progression
-        has_ap = False
-        for comb in itertools.combinations(sequence, 4):
-            if is_arithmetic_progression(comb):
-                has_ap = True
-                break
-                
-        if not has_ap:
-            valid_count += 1
-
-print(f"Total pairs checked: {total_pairs}")
-print(f"Valid pairs (no arithmetic progression): {valid_count}")
-print(f"Therefore, the answer is: {valid_count}")
-</parameter>
-</function>
-
-USER: EXECUTION RESULT of [execute_ipython_cell]:
-Total pairs checked: 276
-Valid pairs (no arithmetic progression): 228
-Therefore, the answer is: 228
-[Jupyter current working directory: /workspace]
-[Jupyter Python interpreter: /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/bin/python]
-
-ASSISTANT: Perfect! My final verification confirms that the answer is indeed 228.
-
-<function=finish>
-<parameter=message>I've solved this problem by verifying each step with Python code and performed a final verification to confirm my answer. The answer is 228.</parameter>
-<parameter=task_completed>true</parameter>
 <parameter=solution>228</parameter>
 </function>
 
