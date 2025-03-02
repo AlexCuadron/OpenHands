@@ -14,7 +14,12 @@ The message should include:
 
 The task_completed field should be set to True if you believed you have completed the task, and False otherwise.
 
-IMPORTANT: For benchmark problems (like MATH-500 or AIME), you MUST use the solution parameter to provide your final answer. The solution should be a concise representation of your answer (e.g., a number, a formula, or a short text). For example, if your answer is 125, set solution="125". If your answer is a fraction like 3/4, set solution="3/4". If your answer is a mathematical expression, you can use LaTeX format.
+IMPORTANT: For benchmark problems (like MATH-500 or AIME), you MUST use the solution parameter to provide your final answer. The solution parameter should contain ONLY the answer value without any explanatory text.
+
+Examples of correct solution parameter usage:
+- If your answer is 125: set solution="125"
+- If your answer is a fraction: set solution="3/4"
+- If your answer is a mathematical expression: set solution="x^2+2x" or use LaTeX format
 """
 
 FinishTool = ChatCompletionToolParam(
