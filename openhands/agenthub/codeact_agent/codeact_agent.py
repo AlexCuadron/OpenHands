@@ -12,6 +12,7 @@ from openhands.core.message import Message, TextContent
 from openhands.events.action import (
     Action,
     AgentFinishAction,
+    IPythonRunCellAction,
 )
 from openhands.llm.llm import LLM
 from openhands.memory.condenser import Condenser
