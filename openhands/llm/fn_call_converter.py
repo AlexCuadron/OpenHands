@@ -38,10 +38,12 @@ multiple lines
 <IMPORTANT>
 Reminder:
 - Function calls MUST follow the specified format, start with <function= and end with </function>
+- ALWAYS include the closing </function> tag for EVERY function call
 - Required parameters MUST be specified
 - Only call one function at a time
 - You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after.
 - If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls
+- For benchmark problems, ALWAYS use the finish function with the solution parameter when providing your final answer
 </IMPORTANT>
 """
 
