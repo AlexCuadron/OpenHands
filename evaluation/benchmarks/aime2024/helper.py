@@ -19,7 +19,7 @@ IMPORTANT GUIDELINES:
 - If code execution reveals errors in your reasoning, acknowledge the mistake and correct your approach
 - Use tools to discover information that might contradict your initial assumptions
 - AIME problems typically have integer answers, so make sure your final answer is an integer
-- When you have the final answer, provide it in the format: "The answer is [your answer]"
+- When you have the final answer, use the finish tool with your solution as the parameter
 
 EXAMPLE STRUCTURE:
 ```
@@ -38,56 +38,85 @@ Combining results:
 Final answer: [Answer]
 ```
 
-For example, if the answer is 42, you can write: "The answer is 42".
+When you have the final answer, use the finish tool with your solution as the parameter.
 """
+
 
 def aime2024_user_response(state, **kwargs):
     """Custom response function for AIME2024 benchmark."""
     # First check if the agent has already provided a solution
-    last_message = next(
-        (event.message for event in reversed(state.history) 
-         if hasattr(event, 'message') and event.message),
-        None
+    # Check if the agent used the finish tool
+    finish_action = next(
+        (
+            event
+            for event in reversed(state.history)
+            if hasattr(event, 'action') and event.action == 'finish'
+        ),
+        None,
     )
     
-    if last_message and ('The answer is' in last_message):
-        # If the agent has provided a solution, let it finish
+    if finish_action:
+        # If the agent has used the finish tool, let it finish
         return '/exit'
     
+    # Also check for "The answer is" in the last message (for backward compatibility)
+    last_message = next(
+        (
+            event.message
+            for event in reversed(state.history)
+            if hasattr(event, 'message') and event.message
+        ),
+        None,
+    )
+
+    if last_message and ('The answer is' in last_message):
+        # If the agent has provided a solution in text, let it finish
+        return '/exit'
+
     # Check if there was a ModuleNotFoundError in recent messages
     recent_messages = [
-        event.message for event in reversed(state.history[:len(state.history)])
+        event.message
+        for event in reversed(state.history[: len(state.history)])
         if hasattr(event, 'message') and event.message
     ][:3]  # Look at the last 3 messages
-    
+
     module_error = any(
         'ModuleNotFoundError' in msg or 'No module named' in msg
-        for msg in recent_messages if msg
+        for msg in recent_messages
+        if msg
     )
-    
+
     has_used_python = any(
         'execute_ipython_cell' in msg or 'EXECUTION RESULT' in msg
-        for msg in recent_messages if msg
+        for msg in recent_messages
+        if msg
     )
-    
+
     # Check if the agent is breaking down the problem into sub-problems
     has_sub_problems = any(
-        ('Sub-problem' in msg or 'Subproblem' in msg or 'Step ' in msg or 'sub-problem' in msg)
-        for msg in recent_messages if msg
+        (
+            'Sub-problem' in msg
+            or 'Subproblem' in msg
+            or 'Step ' in msg
+            or 'sub-problem' in msg
+        )
+        for msg in recent_messages
+        if msg
     )
-    
+
     if module_error:
         # If there was a module error, prompt to install the missing library
-        return "It looks like you need to install some Python libraries. Use %pip install to install the libraries you need (e.g., %pip install sympy numpy scipy matplotlib)."
+        return 'It looks like you need to install some Python libraries. Use %pip install to install the libraries you need (e.g., %pip install sympy numpy scipy matplotlib).'
     elif not has_sub_problems and len(recent_messages) >= 1:
         # If the agent isn't breaking down the problem, encourage it to do so
-        return "Please break down this problem into smaller sub-problems. For each sub-problem: (1) State it clearly, (2) Write Python code to solve it, (3) Verify the result, (4) Explain what you learned."
+        return 'Please break down this problem into smaller sub-problems. For each sub-problem: (1) State it clearly, (2) Write Python code to solve it, (3) Verify the result, (4) Explain what you learned.'
     elif not has_used_python and recent_messages:
         # If the agent hasn't used Python in recent messages, encourage it to do so
         return "Please use Python tools to verify your reasoning for each sub-problem. Don't rely solely on your own thinking - use tools to discover information that might contradict your initial assumptions."
-    
+
     # Otherwise, use the standard CodeActAgent response
     return codeact_user_response(state)
+
 
 FAKE_RESPONSES = {
     'CodeActAgent': aime2024_user_response,
