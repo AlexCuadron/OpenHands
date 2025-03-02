@@ -283,43 +283,7 @@ def normalize_answer(answer: str) -> str:
     return answer
 
 
-def check_answer_correctness(predicted: str, reference: str) -> bool:
-    """Check if the predicted answer matches the reference answer."""
-    if predicted is None:
-        logger.warning('Predicted answer is None')
-        return False
-
-    # Normalize both answers
-    predicted_norm = normalize_answer(predicted)
-    reference_norm = normalize_answer(reference)
-
-    # Log the normalized answers for debugging
-    logger.info(f"Normalized predicted answer: '{predicted_norm}'")
-    logger.info(f"Normalized reference answer: '{reference_norm}'")
-
-    # Try numerical comparison first (for AIME problems which are typically integers)
-    try:
-        # Convert to integers and compare numerically
-        predicted_int = int(predicted_norm)
-        reference_int = int(reference_norm)
-        is_correct = predicted_int == reference_int
-        
-        if is_correct:
-            logger.info(f'✓ Answer is correct! (Numerical match: {predicted_int} = {reference_int})')
-        else:
-            logger.warning(f'✗ Answer is incorrect (Numerical mismatch: {predicted_int} ≠ {reference_int})')
-        
-        return is_correct
-    except (ValueError, TypeError):
-        # Fall back to string comparison if conversion to int fails
-        is_correct = predicted_norm == reference_norm
-        
-        if is_correct:
-            logger.info('✓ Answer is correct! (String match)')
-        else:
-            logger.warning('✗ Answer is incorrect (String mismatch)')
-        
-        return is_correct
+# Function removed - logic moved to test_result creation
 
 
 def process_instance(
@@ -501,12 +465,33 @@ def process_instance(
         predicted_answer = None
         logger.warning("Could not find any answer in the agent's response")
 
-    # Check if the answer is correct
-    is_correct = check_answer_correctness(predicted_answer, instance.answer)
+    # Normalize answers for comparison
+    predicted_norm = normalize_answer(predicted_answer) if predicted_answer is not None else ''
+    reference_norm = normalize_answer(instance.answer) if instance.answer is not None else ''
+    
+    # Try numerical comparison if possible
+    numerical_comparison = False
+    try:
+        if predicted_norm and reference_norm:
+            predicted_int = int(predicted_norm)
+            reference_int = int(reference_norm)
+            is_correct = predicted_int == reference_int
+            numerical_comparison = True
+            logger.info(f"Using numerical comparison: {predicted_int} {'=' if is_correct else '≠'} {reference_int}")
+        else:
+            is_correct = False
+            logger.warning("Cannot perform numerical comparison with empty values")
+    except (ValueError, TypeError):
+        # Fall back to string comparison
+        is_correct = predicted_norm == reference_norm
+        logger.info(f"Using string comparison: '{predicted_norm}' {'=' if is_correct else '≠'} '{reference_norm}'")
 
     test_result = {
         'predicted_answer': predicted_answer,
         'reference_answer': instance.answer,
+        'predicted_normalized': predicted_norm,
+        'reference_normalized': reference_norm,
+        'comparison_method': 'numerical' if numerical_comparison else 'string',
         'is_correct': is_correct,
         'id': instance.id,
         'url': instance.url if 'url' in instance else None,
