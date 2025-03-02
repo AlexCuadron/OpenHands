@@ -15,6 +15,10 @@ PROBLEM-SOLVING APPROACH:
 IMPORTANT GUIDELINES:
 - Verify EVERY step of your reasoning with Python code - don't rely on mental calculations
 - Use powerful libraries like sympy, numpy, and scipy to handle the mathematical heavy lifting
+- Be extremely careful with floating-point calculations and rounding errors:
+  * Use the Fraction class or sympy.Rational for exact arithmetic when possible
+  * Avoid floating-point comparisons for equality
+  * When using floats, check results with sufficient precision
 - Write code early and often - don't wait until you've fully solved the problem
 - Use print statements liberally to see intermediate results
 - If code execution contradicts your reasoning, trust the code and adjust your approach
@@ -113,6 +117,9 @@ def aime2024_user_response(state, **kwargs):
     elif not has_used_python and recent_messages:
         # If the agent hasn't used Python in recent messages, strongly encourage it
         return "You need to verify each step with Python code. Don't proceed with your reasoning until you've confirmed your current step with code execution. Use sympy and numpy to verify your mathematical reasoning."
+    elif any(('float' in msg or 'decimal' in msg or '0.' in msg) for msg in recent_messages if msg):
+        # If the agent is using floating-point calculations, remind about rounding errors
+        return "Be careful with floating-point calculations and rounding errors. Use the Fraction class or sympy.Rational for exact arithmetic when possible. Avoid floating-point comparisons for equality, and when using floats, check results with sufficient precision."
 
     # Otherwise, use the standard CodeActAgent response
     return codeact_user_response(state)
@@ -131,6 +138,10 @@ INST_SUFFIXES: dict[str, str] = {
         '2. IMMEDIATELY write Python code to verify your thinking '
         '3. Use the code execution results to guide your next step '
         'Use mathematical libraries like sympy and numpy to verify calculations. '
+        'Be extremely careful with floating-point calculations and rounding errors: '
+        '- Use the Fraction class or sympy.Rational for exact arithmetic '
+        '- Avoid floating-point comparisons for equality '
+        '- When using floats, check results with sufficient precision '
         'Do not proceed to the next step until you\'ve verified your current step with code. '
         'If code execution contradicts your reasoning, trust the code and adjust your approach. '
         'When you have the final answer (verified with code), use the "finish" tool with your solution as the parameter.\n'
