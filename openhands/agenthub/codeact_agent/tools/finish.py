@@ -14,7 +14,7 @@ The message should include:
 
 The task_completed field should be set to True if you believed you have completed the task, and False otherwise.
 
-For benchmark problems (like MATH-500 or AIME), use the solution parameter to provide your final answer.
+For benchmark problems (like MATH-500 or AIME), use the solution parameter to provide your final answer. The solution should be a concise representation of your answer (e.g., a number, a formula, or a short text).
 """
 
 FinishTool = ChatCompletionToolParam(
@@ -37,7 +37,7 @@ FinishTool = ChatCompletionToolParam(
                 },
                 'solution': {
                     'type': 'string',
-                    'description': 'The solution to the problem (used in benchmarks like MATH-500 or AIME).',
+                    'description': 'The solution to the problem (required for benchmarks like MATH-500 or AIME). Provide a concise representation of your answer (e.g., a number, a formula, or a short text).',
                 },
             },
         },
