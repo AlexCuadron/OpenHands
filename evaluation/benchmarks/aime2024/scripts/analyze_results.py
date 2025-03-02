@@ -81,80 +81,105 @@ def plot_results(summary, output_dir):
     """Plot the results and save the figures."""
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
+    print(f"Saving plots to {output_dir}")
 
     # Overall accuracy
-    plt.figure(figsize=(10, 6))
-    plt.bar(
-        ['Correct', 'Incorrect'],
-        [summary['accuracy'], 1 - summary['accuracy']],
-        color=['green', 'red'],
-    )
-    plt.title(f'Overall Accuracy: {summary["accuracy"]:.2%}')
-    plt.ylabel('Percentage')
-    plt.ylim(0, 1)
-    for i, v in enumerate([summary['accuracy'], 1 - summary['accuracy']]):
-        plt.text(i, v + 0.02, f'{v:.2%}', ha='center')
-    plt.savefig(os.path.join(output_dir, 'overall_accuracy.png'))
+    try:
+        plt.figure(figsize=(10, 6))
+        plt.bar(
+            ['Correct', 'Incorrect'],
+            [summary['accuracy'], 1 - summary['accuracy']],
+            color=['green', 'red'],
+        )
+        plt.title(f'Overall Accuracy: {summary["accuracy"]:.2%}')
+        plt.ylabel('Percentage')
+        plt.ylim(0, 1)
+        for i, v in enumerate([summary['accuracy'], 1 - summary['accuracy']]):
+            plt.text(i, v + 0.02, f'{v:.2%}', ha='center')
+        
+        accuracy_plot_path = os.path.join(output_dir, 'overall_accuracy.png')
+        plt.savefig(accuracy_plot_path)
+        print(f"Saved overall accuracy plot to {accuracy_plot_path}")
+    except Exception as e:
+        print(f"Error creating overall accuracy plot: {e}")
 
     # Accuracy by problem ID
     if summary['by_id']:
-        ids = list(summary['by_id'].keys())
-        accuracies = [summary['by_id'][id]['accuracy'] for id in ids]
+        try:
+            ids = list(summary['by_id'].keys())
+            accuracies = [summary['by_id'][id]['accuracy'] for id in ids]
 
-        plt.figure(figsize=(12, 6))
-        plt.bar(ids, accuracies, color='blue')
-        plt.title('Accuracy by Problem ID')
-        plt.xlabel('Problem ID')
-        plt.ylabel('Accuracy')
-        plt.ylim(0, 1)
-        plt.xticks(rotation=90)
-        plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, 'accuracy_by_id.png'))
+            plt.figure(figsize=(12, 6))
+            plt.bar(ids, accuracies, color='blue')
+            plt.title('Accuracy by Problem ID')
+            plt.xlabel('Problem ID')
+            plt.ylabel('Accuracy')
+            plt.ylim(0, 1)
+            plt.xticks(rotation=90)
+            plt.tight_layout()
+            
+            accuracy_by_id_path = os.path.join(output_dir, 'accuracy_by_id.png')
+            plt.savefig(accuracy_by_id_path)
+            print(f"Saved accuracy by problem ID plot to {accuracy_by_id_path}")
+        except Exception as e:
+            print(f"Error creating accuracy by problem ID plot: {e}")
     
     # Comparison methods
     if 'comparison_methods' in summary and summary['comparison_methods']:
-        methods = list(summary['comparison_methods'].keys())
-        counts = list(summary['comparison_methods'].values())
-        
-        plt.figure(figsize=(10, 6))
-        plt.bar(methods, counts, color='purple')
-        plt.title('Comparison Methods Used')
-        plt.xlabel('Method')
-        plt.ylabel('Count')
-        for i, v in enumerate(counts):
-            plt.text(i, v + 0.5, str(v), ha='center')
-        plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, 'comparison_methods.png'))
+        try:
+            methods = list(summary['comparison_methods'].keys())
+            counts = list(summary['comparison_methods'].values())
+            
+            plt.figure(figsize=(10, 6))
+            plt.bar(methods, counts, color='purple')
+            plt.title('Comparison Methods Used')
+            plt.xlabel('Method')
+            plt.ylabel('Count')
+            for i, v in enumerate(counts):
+                plt.text(i, v + 0.5, str(v), ha='center')
+            plt.tight_layout()
+            
+            comparison_methods_path = os.path.join(output_dir, 'comparison_methods.png')
+            plt.savefig(comparison_methods_path)
+            print(f"Saved comparison methods plot to {comparison_methods_path}")
+        except Exception as e:
+            print(f"Error creating comparison methods plot: {e}")
         
         # Correct vs Incorrect by comparison method
         if 'discrepancies' in summary:
-            # Count incorrect answers by method
-            incorrect_by_method = {}
-            for disc in summary['discrepancies']:
-                if 'comparison_method' in disc:
-                    method = disc['comparison_method']
-                    incorrect_by_method[method] = incorrect_by_method.get(method, 0) + 1
-            
-            # Calculate correct answers by method
-            correct_by_method = {}
-            for method, total in summary['comparison_methods'].items():
-                incorrect = incorrect_by_method.get(method, 0)
-                correct_by_method[method] = total - incorrect
-            
-            # Create stacked bar chart
-            methods = list(summary['comparison_methods'].keys())
-            correct_counts = [correct_by_method.get(m, 0) for m in methods]
-            incorrect_counts = [incorrect_by_method.get(m, 0) for m in methods]
-            
-            plt.figure(figsize=(10, 6))
-            plt.bar(methods, correct_counts, label='Correct', color='green')
-            plt.bar(methods, incorrect_counts, bottom=correct_counts, label='Incorrect', color='red')
-            plt.title('Correct vs Incorrect Answers by Comparison Method')
-            plt.xlabel('Method')
-            plt.ylabel('Count')
-            plt.legend()
-            plt.tight_layout()
-            plt.savefig(os.path.join(output_dir, 'comparison_results.png'))
+            try:
+                # Count incorrect answers by method
+                incorrect_by_method = {}
+                for disc in summary['discrepancies']:
+                    if 'comparison_method' in disc:
+                        method = disc['comparison_method']
+                        incorrect_by_method[method] = incorrect_by_method.get(method, 0) + 1
+                
+                # Calculate correct answers by method
+                correct_by_method = {}
+                for method, total in summary['comparison_methods'].items():
+                    incorrect = incorrect_by_method.get(method, 0)
+                    correct_by_method[method] = total - incorrect
+                
+                # Create stacked bar chart
+                methods = list(summary['comparison_methods'].keys())
+                correct_counts = [correct_by_method.get(m, 0) for m in methods]
+                incorrect_counts = [incorrect_by_method.get(m, 0) for m in methods]
+                
+                plt.figure(figsize=(10, 6))
+                plt.bar(methods, correct_counts, label='Correct', color='green')
+                plt.bar(methods, incorrect_counts, bottom=correct_counts, label='Incorrect', color='red')
+                plt.title('Correct vs Incorrect Answers by Comparison Method')
+                plt.xlabel('Method')
+                plt.ylabel('Count')
+                plt.legend()
+                plt.tight_layout()
+                
+                comparison_results_path = os.path.join(output_dir, 'comparison_results.png')
+                plt.savefig(comparison_results_path)
+                print(f"Saved comparison results plot to {comparison_results_path}")
+            except Exception as e:
+                print(f"Error creating comparison results plot: {e}")
 
 
 def main():
@@ -208,16 +233,25 @@ def main():
             
     # Create a separate CSV file for discrepancies
     if 'discrepancies' in summary and summary['discrepancies']:
-        pd.DataFrame(summary['discrepancies']).to_csv(
-            os.path.join(output_dir, 'discrepancies.csv'), index=False
-        )
+        # Ensure the output directory exists
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Save the discrepancies to a CSV file
+        discrepancies_file = os.path.join(output_dir, 'discrepancies.csv')
+        pd.DataFrame(summary['discrepancies']).to_csv(discrepancies_file, index=False)
+        print(f"Saved discrepancies to {discrepancies_file}")
 
     # Plot results
     plot_results(summary, output_dir)
 
+    # Ensure the output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+    
     # Save summary to file
-    with open(os.path.join(output_dir, 'summary.json'), 'w') as f:
+    summary_file = os.path.join(output_dir, 'summary.json')
+    with open(summary_file, 'w') as f:
         json.dump(summary, f, indent=2)
+    print(f"Saved summary to {summary_file}")
 
     # Create a detailed DataFrame
     details = []
@@ -241,8 +275,14 @@ def main():
             
         details.append(result_dict)
 
+    # Ensure the output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Save detailed results to CSV
     df = pd.DataFrame(details)
-    df.to_csv(os.path.join(output_dir, 'detailed_results.csv'), index=False)
+    detailed_results_file = os.path.join(output_dir, 'detailed_results.csv')
+    df.to_csv(detailed_results_file, index=False)
+    print(f"Saved detailed results to {detailed_results_file}")
 
     print(f'Analysis saved to {output_dir}')
 
