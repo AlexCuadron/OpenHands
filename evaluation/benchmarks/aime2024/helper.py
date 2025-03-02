@@ -1,21 +1,19 @@
 from evaluation.utils.shared import codeact_user_response
 
 INSTRUCTIONS_ADDENDUM = """
-Please solve this problem by breaking it down into sub-problems and using tools to verify each step.
+Please solve this problem using a programmatic approach with Python to verify your work.
 
 PROBLEM-SOLVING APPROACH:
-1. ANALYZE: First, carefully analyze the problem and identify 2-4 distinct sub-problems or steps needed to reach the solution
-2. PLAN: For each sub-problem, plan how you'll use Python tools to solve it
-3. EXECUTE: Solve each sub-problem separately, using Python to verify your work
-4. COMBINE: Combine the results from all sub-problems to find the final answer
+1. ANALYZE: First, carefully analyze the problem and understand what's being asked
+2. PLAN: Develop a programmatic approach using Python to solve the problem
+3. IMPLEMENT: Write Python code to implement your solution
+4. VERIFY: Test your solution with examples and edge cases
 
 IMPORTANT GUIDELINES:
 - Start by installing any libraries you need: `%pip install sympy numpy scipy matplotlib`
-- For EACH sub-problem:
-  * State the sub-problem clearly
-  * Use Python code to solve it
-  * Verify the result
-  * Explain what you learned
+- Use Python's mathematical libraries (sympy, numpy, etc.) to solve the problem efficiently
+- Implement your solution step-by-step, explaining your approach
+- Verify your solution with test cases or examples
 - If code execution reveals errors in your reasoning, acknowledge the mistake and correct your approach
 - Use tools to discover information that might contradict your initial assumptions
 - AIME problems typically have integer answers, so make sure your final answer is an integer
@@ -23,18 +21,18 @@ IMPORTANT GUIDELINES:
 
 EXAMPLE STRUCTURE:
 ```
-Sub-problem 1: [Description]
-[Python code to solve sub-problem 1]
-Result: [What you learned]
+Problem Analysis:
+[Brief analysis of the problem]
 
-Sub-problem 2: [Description]
-[Python code to solve sub-problem 2]
-Result: [What you learned]
+Solution Approach:
+[Explanation of your programmatic approach]
 
-...
+Implementation:
+[Python code implementing your solution]
 
-Combining results:
-[Python code to combine results]
+Verification:
+[Python code testing your solution]
+
 Final answer: [Answer]
 ```
 
@@ -92,13 +90,14 @@ def aime2024_user_response(state, **kwargs):
         if msg
     )
 
-    # Check if the agent is breaking down the problem into sub-problems
-    has_sub_problems = any(
+    # Check if the agent is using a programmatic approach
+    has_programmatic_approach = any(
         (
-            'Sub-problem' in msg
-            or 'Subproblem' in msg
-            or 'Step ' in msg
-            or 'sub-problem' in msg
+            'Solution Approach' in msg
+            or 'Implementation' in msg
+            or 'Verification' in msg
+            or 'programmatic' in msg
+            or 'algorithm' in msg
         )
         for msg in recent_messages
         if msg
@@ -107,12 +106,12 @@ def aime2024_user_response(state, **kwargs):
     if module_error:
         # If there was a module error, prompt to install the missing library
         return 'It looks like you need to install some Python libraries. Use %pip install to install the libraries you need (e.g., %pip install sympy numpy scipy matplotlib).'
-    elif not has_sub_problems and len(recent_messages) >= 1:
-        # If the agent isn't breaking down the problem, encourage it to do so
-        return 'Please break down this problem into smaller sub-problems. For each sub-problem: (1) State it clearly, (2) Write Python code to solve it, (3) Verify the result, (4) Explain what you learned.'
+    elif not has_programmatic_approach and len(recent_messages) >= 1:
+        # If the agent isn't using a programmatic approach, encourage it to do so
+        return 'Please develop a programmatic approach to solve this problem. Analyze the problem, plan your solution, implement it in Python, and verify your results with test cases.'
     elif not has_used_python and recent_messages:
         # If the agent hasn't used Python in recent messages, encourage it to do so
-        return "Please use Python tools to verify your reasoning for each sub-problem. Don't rely solely on your own thinking - use tools to discover information that might contradict your initial assumptions."
+        return "Please use Python to implement your solution. Mathematical libraries like sympy and numpy can help you solve this problem efficiently. Don't rely solely on your own thinking - use code to verify your approach."
 
     # Otherwise, use the standard CodeActAgent response
     return codeact_user_response(state)
@@ -124,13 +123,15 @@ FAKE_RESPONSES = {
 
 INST_SUFFIXES: dict[str, str] = {
     'CodeActAgent': (
-        'IMPORTANT: Break down this problem into 2-4 distinct sub-problems and solve each one separately using Python tools. '
-        'For each sub-problem: (1) State it clearly, (2) Write Python code to solve it, (3) Verify the result, (4) Explain what you learned. '
-        'First, install any libraries you need using %pip install (e.g., %pip install sympy numpy scipy matplotlib). '
-        'Do not trust your own reasoning without verification through tool execution. '
-        'If tool execution reveals errors in your thinking, acknowledge them and correct your approach. '
-        'After solving all sub-problems, combine the results with Python code to find the final answer. '
-        'When you have the final answer (verified with tools), use the "finish" tool with your solution as the parameter.\n'
+        'IMPORTANT: Develop a programmatic approach to solve this problem using Python. '
+        'First, analyze the problem and understand what is being asked. '
+        'Then, plan your solution and implement it step-by-step in Python. '
+        'Install any libraries you need using %pip install (e.g., %pip install sympy numpy scipy matplotlib). '
+        'Use mathematical libraries like sympy and numpy to solve the problem efficiently. '
+        'Verify your solution with test cases or examples. '
+        'Do not trust your own reasoning without verification through code execution. '
+        'If code execution reveals errors in your thinking, acknowledge them and correct your approach. '
+        'When you have the final answer (verified with code), use the "finish" tool with your solution as the parameter.\n'
         'For example: finish(solution="42")\n'
     )
 }
