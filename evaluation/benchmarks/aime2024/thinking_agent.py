@@ -251,11 +251,23 @@ def analyze_overthinking(
 
     # Get the analysis from the LLM
     messages = [{'role': 'user', 'content': prompt}]
-    response = llm.chat_completion(messages=messages)
+    response = llm.completion(messages=messages)
 
     # Extract the JSON response
     try:
-        content = response.choices[0].message.content
+        # Extract content from the response
+        if hasattr(response, 'choices') and len(response.choices) > 0:
+            if hasattr(response.choices[0], 'message'):
+                content = response.choices[0].message.content
+            elif hasattr(response.choices[0], 'text'):
+                content = response.choices[0].text
+            else:
+                logger.warning("Unexpected response format from LLM")
+                content = str(response)
+        else:
+            logger.warning("Unexpected response format from LLM")
+            content = str(response)
+            
         # Find JSON content using regex
         json_match = re.search(r'\{.*\}', content, re.DOTALL)
         if json_match:
