@@ -118,24 +118,20 @@ ASSISTANT: Now I'll tackle sub-problem 2 - defining a function to check if four 
 # Sub-problem 2: Define a function to check if four numbers form an arithmetic progression
 
 def is_arithmetic_progression(numbers):
-    """
-    Check if a set of numbers forms an arithmetic progression.
-    An arithmetic progression has equal differences between consecutive terms.
-    """
     if len(numbers) < 2:
         return False
-    
+
     # Sort the numbers (since we're checking any four terms, not necessarily in order)
     sorted_nums = sorted(numbers)
-    
+
     # Calculate the common difference
     d = sorted_nums[1] - sorted_nums[0]
-    
+
     # Check if all consecutive pairs have the same difference
     for i in range(1, len(sorted_nums) - 1):
         if sorted_nums[i + 1] - sorted_nums[i] != d:
             return False
-    
+
     return True
 
 # Test the function with some examples
@@ -169,14 +165,13 @@ ASSISTANT: Now for sub-problem 3, I'll identify some specific invalid pairs (a,b
 # Sub-problem 3: Identify specific invalid pairs (a,b) that create arithmetic progressions
 
 def check_invalid_pair(a, b):
-    """Check if a specific (a,b) pair creates a sequence with a four-term AP"""
     sequence = [3, 4, 5, a, b, 30, 40, 50]
-    
+
     # Check all possible 4-element combinations
     for comb in itertools.combinations(sequence, 4):
         if is_arithmetic_progression(comb):
             return True, comb
-    
+
     return False, None
 
 # Test some specific pairs
@@ -214,24 +209,24 @@ ASSISTANT: Now I'll solve sub-problem 4 by counting all valid pairs. Since there
 def count_valid_pairs():
     valid_count = 0
     invalid_count = 0
-    
+
     # Iterate over all possible a values (6 <= a <= 28)
     for a in range(6, 29):
         # For each a, iterate over possible b values (a+1 <= b <= 29)
         for b in range(a + 1, 30):
             sequence = [3, 4, 5, a, b, 30, 40, 50]
             has_ap = False
-            
+
             # Check all 4-element combinations
             for comb in itertools.combinations(sequence, 4):
                 if is_arithmetic_progression(comb):
                     has_ap = True
                     invalid_count += 1
                     break  # No need to check further if an AP is found
-                    
+
             if not has_ap:
                 valid_count += 1
-    
+
     return valid_count, invalid_count
 
 # Run the counting function
@@ -534,7 +529,8 @@ def convert_fncall_messages_to_non_fncall_messages(
                                 and tool['function']['name'] == 'execute_bash'
                                 and 'parameters' in tool['function']
                                 and 'properties' in tool['function']['parameters']
-                                and 'command' in tool['function']['parameters']['properties']
+                                and 'command'
+                                in tool['function']['parameters']['properties']
                             )
                             for tool in tools
                         )
@@ -546,7 +542,8 @@ def convert_fncall_messages_to_non_fncall_messages(
                                 and tool['function']['name'] == 'execute_ipython_cell'
                                 and 'parameters' in tool['function']
                                 and 'properties' in tool['function']['parameters']
-                                and 'code' in tool['function']['parameters']['properties']
+                                and 'code'
+                                in tool['function']['parameters']['properties']
                             )
                             for tool in tools
                         )
@@ -715,10 +712,12 @@ def _extract_and_validate_params(
                 pass
 
         # Enum check
-        if ('parameters' in matching_tool and 
-            'properties' in matching_tool['parameters'] and 
-            param_name in matching_tool['parameters']['properties'] and
-            'enum' in matching_tool['parameters']['properties'][param_name]):
+        if (
+            'parameters' in matching_tool
+            and 'properties' in matching_tool['parameters']
+            and param_name in matching_tool['parameters']['properties']
+            and 'enum' in matching_tool['parameters']['properties'][param_name]
+        ):
             if (
                 param_value
                 not in matching_tool['parameters']['properties'][param_name]['enum']
