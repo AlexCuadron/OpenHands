@@ -28,27 +28,57 @@ def format_interaction_for_thinking_agent(history: List[Dict]) -> str:
     formatted_str = ""
     
     # Extract the initial problem statement
-    initial_message = next(
-        (event.get('message', '') for event in history if hasattr(event, 'message') and event.get('role') == 'user'),
-        "No initial message found"
-    )
+    initial_message = None
+    for event in history:
+        if hasattr(event, 'message') and getattr(event, 'role', None) == 'user':
+            initial_message = event.message
+            break
     
-    formatted_str += f"INITIAL PROBLEM:\n{initial_message}\n\n"
+    if initial_message:
+        formatted_str += f"INITIAL PROBLEM:\n{initial_message}\n\n"
+    else:
+        formatted_str += "INITIAL PROBLEM:\nNo initial message found\n\n"
     
     # Extract the interactions (assistant responses and tool calls/results)
     for i, event in enumerate(history):
-        if hasattr(event, 'message') and event.get('role') == 'assistant':
-            formatted_str += f"RESPONSE:\n{event.get('message', '')}\n\n"
-        elif hasattr(event, 'action') and event.get('action'):
+        if hasattr(event, 'role') and event.role == 'assistant' and hasattr(event, 'message'):
+            formatted_str += f"RESPONSE:\n{event.message}\n\n"
+        elif hasattr(event, 'action'):
             # This is a tool call
-            action = event.get('action')
-            action_input = event.get('action_input', {})
+            action = event.action
+            action_input = getattr(event, 'action_input', {})
             formatted_str += f"OBSERVATION:\n[Tool Call: {action}]\n{json.dumps(action_input, indent=2)}\n\n"
-        elif hasattr(event, 'result') and event.get('result'):
+        elif hasattr(event, 'result'):
             # This is a tool result
-            formatted_str += f"OBSERVATION:\n{event.get('result', '')}\n\n"
+            formatted_str += f"OBSERVATION:\n{event.result}\n\n"
     
     return formatted_str
+
+
+def save_interaction_to_file(history: List[Dict], output_dir: str, instance_id: str) -> str:
+    """
+    Save the interaction history to a file in the format expected by the ThinkingAgent.
+    
+    Args:
+        history: List of interaction events from the agent's history
+        output_dir: Directory to save the file
+        instance_id: ID of the instance
+        
+    Returns:
+        str: Path to the saved file
+    """
+    # Create the output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Format the interaction history
+    formatted_interaction = format_interaction_for_thinking_agent(history)
+    
+    # Save to file
+    file_path = os.path.join(output_dir, f"responses_observations_{instance_id}.txt")
+    with open(file_path, 'w') as f:
+        f.write(formatted_interaction)
+    
+    return file_path
 
 
 def create_overthinking_analysis_prompt(interaction_content: str) -> str:
@@ -123,19 +153,30 @@ Provide your analysis in JSON format with the following structure:
     return prompt
 
 
-def analyze_overthinking(history: List[Dict], llm: LLM) -> Tuple[int, Dict]:
+def analyze_overthinking(history: List[Dict], llm: LLM, output_dir: str = None, instance_id: str = None) -> Tuple[int, Dict]:
     """
     Analyze the interaction history for overthinking behavior.
     
     Args:
         history: List of interaction events from the agent's history
         llm: LLM instance to use for analysis
+        output_dir: Directory to save interaction files (optional)
+        instance_id: ID of the instance (optional)
         
     Returns:
         Tuple[int, Dict]: Overthinking score and detailed analysis
     """
-    # Format the interaction history
-    interaction_content = format_interaction_for_thinking_agent(history)
+    # Save the interaction to a file if output_dir and instance_id are provided
+    if output_dir and instance_id:
+        interaction_file = save_interaction_to_file(history, output_dir, instance_id)
+        logger.info(f"Saved interaction to file: {interaction_file}")
+        
+        # Read the interaction content from the file
+        with open(interaction_file, 'r') as f:
+            interaction_content = f.read()
+    else:
+        # Format the interaction history directly
+        interaction_content = format_interaction_for_thinking_agent(history)
     
     # Create the analysis prompt
     prompt = create_overthinking_analysis_prompt(interaction_content)
@@ -152,6 +193,20 @@ def analyze_overthinking(history: List[Dict], llm: LLM) -> Tuple[int, Dict]:
         if json_match:
             analysis = json.loads(json_match.group(0))
             overthinking_score = int(analysis.get('overthinking_score', 0))
+            
+            # Save the analysis to a file if output_dir and instance_id are provided
+            if output_dir and instance_id:
+                analysis_file = os.path.join(output_dir, f"overthinking_analysis_{instance_id}.json")
+                with open(analysis_file, 'w') as f:
+                    json.dump(analysis, f, indent=2)
+                logger.info(f"Saved overthinking analysis to file: {analysis_file}")
+                
+                # Also save the full LLM response
+                response_file = os.path.join(output_dir, f"overthinking_response_{instance_id}.txt")
+                with open(response_file, 'w') as f:
+                    f.write(content)
+                logger.info(f"Saved overthinking response to file: {response_file}")
+            
             return overthinking_score, analysis
         else:
             logger.warning("Could not extract JSON from LLM response")

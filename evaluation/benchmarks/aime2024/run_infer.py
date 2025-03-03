@@ -540,14 +540,24 @@ def process_instance(
             # Initialize the ThinkingAgent LLM
             thinking_agent_llm = get_thinking_agent_llm()
             
+            # Create a directory for overthinking analysis files
+            overthinking_dir = os.path.join(metadata.eval_output_dir, 'overthinking_analysis')
+            os.makedirs(overthinking_dir, exist_ok=True)
+            
             # Analyze the solution for overthinking
-            overthinking_score, analysis = analyze_overthinking(state.history, thinking_agent_llm)
+            overthinking_score, analysis = analyze_overthinking(
+                state.history, 
+                thinking_agent_llm,
+                output_dir=overthinking_dir,
+                instance_id=str(instance.instance_id)
+            )
             
             # Add overthinking analysis to test_result
             test_result['overthinking_score'] = overthinking_score
             test_result['overthinking_analysis'] = analysis
             
             logger.info(f"Overthinking analysis completed. Score: {overthinking_score}/10")
+            logger.info(f"Overthinking analysis files saved to: {overthinking_dir}")
             
             # Check if the solution should be discarded based on the overthinking score
             if should_discard_solution(overthinking_score, int(overthinking_threshold)):

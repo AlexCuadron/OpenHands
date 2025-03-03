@@ -67,6 +67,30 @@ def analyze_results(results):
             method = r['test_result']['comparison_method']
             comparison_methods[method] = comparison_methods.get(method, 0) + 1
 
+    # Analyze overthinking scores if available
+    overthinking_scores = []
+    solutions_discarded = 0
+    
+    for r in results:
+        # Check for overthinking score
+        if 'overthinking_score' in r['test_result']:
+            overthinking_scores.append(r['test_result']['overthinking_score'])
+            
+            # Check if solution was discarded due to overthinking
+            if r['test_result'].get('solution_discarded', False):
+                solutions_discarded += 1
+    
+    # Calculate overthinking statistics if scores are available
+    overthinking_stats = {}
+    if overthinking_scores:
+        overthinking_stats = {
+            'min': min(overthinking_scores),
+            'max': max(overthinking_scores),
+            'avg': sum(overthinking_scores) / len(overthinking_scores),
+            'count': len(overthinking_scores),
+            'solutions_discarded': solutions_discarded,
+        }
+    
     return {
         'total': total,
         'correct': correct,
@@ -74,6 +98,7 @@ def analyze_results(results):
         'by_id': dict(by_id),
         'discrepancies': discrepancies,
         'comparison_methods': comparison_methods,
+        'overthinking_stats': overthinking_stats,
     }
 
 
@@ -180,6 +205,73 @@ def plot_results(summary, output_dir):
                 print(f"Saved comparison results plot to {comparison_results_path}")
             except Exception as e:
                 print(f"Error creating comparison results plot: {e}")
+    
+    # Plot overthinking scores if available
+    if 'overthinking_stats' in summary and summary['overthinking_stats']:
+        try:
+            # Create a histogram of overthinking scores
+            plt.figure(figsize=(10, 6))
+            
+            # Get overthinking scores from all results
+            scores = []
+            for r in results:
+                if 'overthinking_score' in r['test_result']:
+                    scores.append(r['test_result']['overthinking_score'])
+            
+            # Create histogram with 11 bins (0-10)
+            plt.hist(scores, bins=range(12), color='orange', edgecolor='black', alpha=0.7)
+            plt.title('Distribution of Overthinking Scores')
+            plt.xlabel('Overthinking Score (0-10)')
+            plt.ylabel('Number of Solutions')
+            plt.xticks(range(11))
+            plt.grid(axis='y', alpha=0.3)
+            
+            # Add vertical line at the average
+            avg_score = summary['overthinking_stats']['avg']
+            plt.axvline(x=avg_score, color='red', linestyle='--', label=f'Average: {avg_score:.2f}')
+            plt.legend()
+            
+            overthinking_hist_path = os.path.join(output_dir, 'overthinking_scores.png')
+            plt.savefig(overthinking_hist_path)
+            print(f"Saved overthinking scores histogram to {overthinking_hist_path}")
+            
+            # Create a scatter plot of overthinking score vs correctness
+            plt.figure(figsize=(10, 6))
+            
+            # Prepare data
+            correct_scores = []
+            incorrect_scores = []
+            discarded_scores = []
+            
+            for r in results:
+                if 'overthinking_score' in r['test_result']:
+                    score = r['test_result']['overthinking_score']
+                    if r['test_result'].get('solution_discarded', False):
+                        discarded_scores.append(score)
+                    elif r['test_result']['is_correct']:
+                        correct_scores.append(score)
+                    else:
+                        incorrect_scores.append(score)
+            
+            # Create scatter plot
+            plt.scatter([0] * len(correct_scores), correct_scores, color='green', label='Correct', alpha=0.7)
+            plt.scatter([1] * len(incorrect_scores), incorrect_scores, color='red', label='Incorrect', alpha=0.7)
+            plt.scatter([2] * len(discarded_scores), discarded_scores, color='orange', label='Discarded', alpha=0.7)
+            
+            plt.title('Overthinking Scores by Solution Outcome')
+            plt.xlabel('Outcome')
+            plt.ylabel('Overthinking Score (0-10)')
+            plt.xticks([0, 1, 2], ['Correct', 'Incorrect', 'Discarded'])
+            plt.ylim(-0.5, 10.5)
+            plt.grid(axis='y', alpha=0.3)
+            plt.legend()
+            
+            overthinking_scatter_path = os.path.join(output_dir, 'overthinking_by_outcome.png')
+            plt.savefig(overthinking_scatter_path)
+            print(f"Saved overthinking by outcome plot to {overthinking_scatter_path}")
+            
+        except Exception as e:
+            print(f"Error creating overthinking plots: {e}")
 
 
 def main():
@@ -209,6 +301,16 @@ def main():
     print(f"Total problems: {summary['total']}")
     print(f"Correct answers: {summary['correct']}")
     print(f"Overall accuracy: {summary['accuracy']:.2%}")
+    
+    # Print overthinking statistics if available
+    if 'overthinking_stats' in summary and summary['overthinking_stats']:
+        print("\nOverthinking statistics:")
+        stats = summary['overthinking_stats']
+        print(f"  Analyzed solutions: {stats['count']}")
+        print(f"  Average overthinking score: {stats['avg']:.2f}")
+        print(f"  Min overthinking score: {stats['min']}")
+        print(f"  Max overthinking score: {stats['max']}")
+        print(f"  Solutions discarded: {stats['solutions_discarded']} ({stats['solutions_discarded']/stats['count']:.2%} of analyzed)")
     
     # Print comparison method statistics
     if 'comparison_methods' in summary:
@@ -272,6 +374,12 @@ def main():
             result_dict['reference_normalized'] = r['test_result']['reference_normalized']
         if 'comparison_method' in r['test_result']:
             result_dict['comparison_method'] = r['test_result']['comparison_method']
+            
+        # Add overthinking information if available
+        if 'overthinking_score' in r['test_result']:
+            result_dict['overthinking_score'] = r['test_result']['overthinking_score']
+        if 'solution_discarded' in r['test_result']:
+            result_dict['solution_discarded'] = r['test_result']['solution_discarded']
             
         details.append(result_dict)
 
