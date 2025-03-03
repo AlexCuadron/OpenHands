@@ -608,8 +608,9 @@ def process_instance(
             # Check if the solution should be discarded based on the overthinking score
             if should_discard_solution(overthinking_score, int(overthinking_threshold)):
                 logger.warning(f"Solution discarded due to high overthinking score: {overthinking_score} > {overthinking_threshold}")
-                test_result['solution_discarded'] = True
-                test_result['is_correct'] = False  # Mark as incorrect if discarded
+                
+                # Instead of just marking as incorrect, raise an exception to trigger a retry
+                raise Exception(f"Overthinking detected with score {overthinking_score} > threshold {overthinking_threshold}. Retrying...")
             else:
                 test_result['solution_discarded'] = False
         except Exception as e:
