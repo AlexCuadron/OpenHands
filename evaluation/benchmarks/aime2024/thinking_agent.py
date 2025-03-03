@@ -315,8 +315,17 @@ def get_thinking_agent_llm() -> LLM:
     )
 
     if os.path.exists(thinking_agent_config_path):
-        config_data = load_from_toml(thinking_agent_config_path)
-        llm_config = LLMConfig.model_validate(config_data.get('llm', {}))
+        # Import toml directly to avoid issues with load_from_toml
+        import toml
+        try:
+            config_data = toml.load(thinking_agent_config_path)
+            llm_config = LLMConfig.model_validate(config_data.get('llm', {}))
+        except Exception as e:
+            logger.warning(f"Error loading thinking agent config: {e}. Using default config.")
+            # Use default configuration
+            llm_config = LLMConfig(
+                model='claude-3-5-sonnet-20241022', temperature=0.0, max_output_tokens=4096
+            )
     else:
         # Use default configuration
         llm_config = LLMConfig(
