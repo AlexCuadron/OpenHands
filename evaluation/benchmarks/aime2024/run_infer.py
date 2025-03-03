@@ -266,8 +266,16 @@ def normalize_answer(answer: str) -> str:
     # Check if the answer contains mathematical expressions like sqrt
     has_math_expr = 'sqrt' in answer.lower() or '\\sqrt' in answer
     
+    # Check if the answer contains currency symbols
+    has_currency = '$' in answer or '\\$' in answer or '£' in answer or '€' in answer
+    
     # Remove LaTeX backslashes but keep 'sqrt' intact
     answer = re.sub(r'\\sqrt', 'sqrt', answer)
+    
+    # Handle currency symbols - preserve the $ symbol for currency values
+    answer = re.sub(r'\\$', '$', answer)  # Convert LaTeX \$ to $
+    
+    # Remove other LaTeX backslashes
     answer = re.sub(r'\\', '', answer)
 
     # Remove all whitespace
@@ -294,18 +302,27 @@ def normalize_answer(answer: str) -> str:
     if has_math_expr:
         return answer
     
+    # Handle currency values specially
+    if has_currency:
+        # Extract the full currency value (including dollars and cents)
+        currency_match = re.search(r'(\$\d+\.\d+|\$\d+)', answer)
+        if currency_match:
+            currency_value = currency_match.group(1)
+            # For comparison, keep the full value including the $ symbol
+            return currency_value
+    
     # For AIME problems with pure numbers, we typically want just the number
     # Check if the answer is purely numeric
-    if re.match(r'^\d+$', answer):
+    if re.match(r'^\d+$', answer) or re.match(r'^\d+\.\d+$', answer):
         return answer
         
     # First, try to extract just the number if it's the last thing in the string
-    number_match = re.search(r'(\d+)$', answer)
+    number_match = re.search(r'(\d+\.\d+|\d+)$', answer)
     if number_match:
         return number_match.group(1)
 
     # If that fails, try to extract any number from the string
-    number_match = re.search(r'(\d+)', answer)
+    number_match = re.search(r'(\d+\.\d+|\d+)', answer)
     if number_match:
         return number_match.group(1)
 
@@ -498,22 +515,51 @@ def process_instance(
     predicted_norm = normalize_answer(predicted_answer) if predicted_answer is not None else ''
     reference_norm = normalize_answer(instance.answer) if instance.answer is not None else ''
     
-    # Try numerical comparison if possible
+    # Check if either answer contains a currency symbol
+    has_currency = ('$' in predicted_norm or '$' in reference_norm or 
+                   '£' in predicted_norm or '£' in reference_norm or 
+                   '€' in predicted_norm or '€' in reference_norm)
+    
+    # Try numerical comparison if possible and not dealing with currency
     numerical_comparison = False
-    try:
-        if predicted_norm and reference_norm:
-            predicted_int = int(predicted_norm)
-            reference_int = int(reference_norm)
-            is_correct = predicted_int == reference_int
-            numerical_comparison = True
-            logger.info(f"Using numerical comparison: {predicted_int} {'=' if is_correct else '≠'} {reference_int}")
-        else:
-            is_correct = False
-            logger.warning("Cannot perform numerical comparison with empty values")
-    except (ValueError, TypeError):
-        # Fall back to string comparison
+    if not has_currency:
+        try:
+            if predicted_norm and reference_norm:
+                # Try to convert to float first to handle decimal values
+                try:
+                    predicted_float = float(predicted_norm)
+                    reference_float = float(reference_norm)
+                    
+                    # If both are integers (no decimal part), compare as integers
+                    if predicted_float.is_integer() and reference_float.is_integer():
+                        predicted_int = int(predicted_float)
+                        reference_int = int(reference_float)
+                        is_correct = predicted_int == reference_int
+                        numerical_comparison = True
+                        logger.info(f"Using integer comparison: {predicted_int} {'=' if is_correct else '≠'} {reference_int}")
+                    else:
+                        # Compare as floats with a small tolerance for floating-point errors
+                        is_correct = abs(predicted_float - reference_float) < 1e-9
+                        numerical_comparison = True
+                        logger.info(f"Using float comparison: {predicted_float} {'=' if is_correct else '≠'} {reference_float}")
+                except ValueError:
+                    # If float conversion fails, try integer conversion
+                    predicted_int = int(predicted_norm)
+                    reference_int = int(reference_norm)
+                    is_correct = predicted_int == reference_int
+                    numerical_comparison = True
+                    logger.info(f"Using integer comparison: {predicted_int} {'=' if is_correct else '≠'} {reference_int}")
+            else:
+                is_correct = False
+                logger.warning("Cannot perform numerical comparison with empty values")
+        except (ValueError, TypeError):
+            # Fall back to string comparison
+            is_correct = predicted_norm == reference_norm
+            logger.info(f"Using string comparison: '{predicted_norm}' {'=' if is_correct else '≠'} '{reference_norm}'")
+    else:
+        # For currency values, use direct string comparison
         is_correct = predicted_norm == reference_norm
-        logger.info(f"Using string comparison: '{predicted_norm}' {'=' if is_correct else '≠'} '{reference_norm}'")
+        logger.info(f"Using currency string comparison: '{predicted_norm}' {'=' if is_correct else '≠'} '{reference_norm}'")
 
     test_result = {
         'predicted_answer': predicted_answer,
