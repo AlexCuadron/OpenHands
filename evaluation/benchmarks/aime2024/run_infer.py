@@ -67,6 +67,10 @@ def get_config(
     llm_config = update_llm_config_for_completions_logging(
         metadata.llm_config, metadata.eval_output_dir, str(instance.instance_id)
     )
+    
+    # Set temperature to 0.6 as recommended for mathematical problems
+    llm_config.temperature = 0.6
+    logger.info(f'Set temperature to 0.6 for AIME2024 benchmark')
 
     # Disable native tool calling for Together.ai models
     if llm_config and (
