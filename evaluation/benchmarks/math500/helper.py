@@ -23,7 +23,7 @@ IMPORTANT GUIDELINES:
 - Use print statements liberally to see intermediate results
 - If code execution contradicts your reasoning, trust the code and adjust your approach
 - If your code produces errors, fix them immediately before proceeding
-- When you have the final answer, use the finish tool with your solution as the parameter
+- When you have the final answer, put it in a \\boxed{} notation AND use the finish tool with your solution as the parameter
 
 EXAMPLE STRUCTURE:
 ```
@@ -39,11 +39,11 @@ Step 3: Final solution
 [Brief explanation of your solution]
 [Python code to verify the final answer]
 
-Final answer: [Answer]
+The final answer is \\boxed{42}
 ```
 
 Remember: Verify each step with code as you go. Don't trust your reasoning without code verification.
-When you have the final answer, use the finish tool with your solution as the parameter. You'll be asked to run a final verification before your solution is accepted.
+When you have the final answer, put it in a \\boxed{} notation AND use the finish tool with your solution as the parameter. You'll be asked to run a final verification before your solution is accepted.
 """
 
 
@@ -74,7 +74,7 @@ def math500_user_response(state, **kwargs):
         None,
     )
 
-    if last_message and ('boxed{' in last_message or 'The answer is' in last_message):
+    if last_message and ('boxed{' in last_message or '\\boxed{' in last_message or 'The answer is' in last_message):
         # If the agent has provided a solution in text, let it finish
         return '/exit'
 
@@ -144,9 +144,9 @@ INST_SUFFIXES: dict[str, str] = {
         '- When using floats, check results with sufficient precision '
         'Do not proceed to the next step until you\'ve verified your current step with code. '
         'If code execution contradicts your reasoning, trust the code and adjust your approach. '
-        'When you have the final answer (verified with code), use the "finish" tool with your solution as the parameter.\n'
+        'When you have the final answer (verified with code), put it in a \\boxed{} notation AND use the "finish" tool with your solution as the parameter.\n'
         'You\'ll be asked to run a final verification before your solution is accepted.\n'
-        'For example: finish(solution="\\boxed{42}")\n'
+        'For example: The final answer is \\boxed{42} and then finish(solution="42")\n'
         'Remember: Don\'t trust your reasoning without code verification!\n'
     )
 }
