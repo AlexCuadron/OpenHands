@@ -10,6 +10,7 @@ NUM_WORKERS=${5:-5}
 EVAL_IDS=${6:-""}
 ALLOWED_TOOLS=${7:-"ipython_only"}
 NUM_RUNS=${8:-3}  # Default to 3 runs
+OVERTHINKING_THRESHOLD=${9:-""}  # Optional overthinking threshold
 
 # Create a directory for the multiple runs
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
@@ -22,6 +23,9 @@ echo "Agent: ${AGENT}"
 echo "Number of examples: ${EVAL_LIMIT}"
 echo "Number of runs: ${NUM_RUNS}"
 echo "Output directory: ${OUTPUT_DIR}"
+if [ -n "${OVERTHINKING_THRESHOLD}" ]; then
+    echo "Overthinking threshold: ${OVERTHINKING_THRESHOLD}"
+fi
 
 # Run the benchmark multiple times
 for i in $(seq 1 ${NUM_RUNS}); do
@@ -41,6 +45,7 @@ for i in $(seq 1 ${NUM_RUNS}); do
         "${EVAL_IDS}" \
         "eval" \
         "${ALLOWED_TOOLS}" \
+        "${OVERTHINKING_THRESHOLD}" \
         "${RUN_DIR}"
     
     echo "Completed run ${i}/${NUM_RUNS}"

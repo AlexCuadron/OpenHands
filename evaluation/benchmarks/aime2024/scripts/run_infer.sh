@@ -11,6 +11,7 @@ NUM_WORKERS=$5
 EVAL_IDS=$6
 RUN_EVALUATION=$7  # Parameter to run evaluation after benchmark
 ALLOWED_TOOLS=${8:-"all"}  # Parameter to specify allowed tools, default is "all"
+OVERTHINKING_THRESHOLD=$9  # Parameter to specify overthinking threshold
 
 # Function to clean up temporary files
 cleanup() {
@@ -71,6 +72,12 @@ COMMAND="export PYTHONPATH=evaluation/benchmarks/aime2024:\$PYTHONPATH && poetry
 # Print the allowed tools
 echo "ALLOWED_TOOLS: $ALLOWED_TOOLS"
 
+# Add overthinking threshold if provided
+if [ -n "$OVERTHINKING_THRESHOLD" ]; then
+  echo "OVERTHINKING_THRESHOLD: $OVERTHINKING_THRESHOLD"
+  COMMAND="$COMMAND --overthinking-threshold $OVERTHINKING_THRESHOLD"
+fi
+
 if [ -n "$EVAL_LIMIT" ]; then
   echo "EVAL_LIMIT: $EVAL_LIMIT"
   COMMAND="$COMMAND --eval-n-limit $EVAL_LIMIT"
@@ -115,11 +122,11 @@ if [ "$RUN_EVALUATION" = "eval" ]; then
   echo "Running evaluation on results..."
   echo "======================================"
   echo ""
-  
+
   if [ -f "$OUTPUT_FILE" ]; then
     echo "Evaluating results in: $OUTPUT_FILE"
     poetry run python evaluation/benchmarks/aime2024/scripts/analyze_results.py "$OUTPUT_FILE" --output-dir "$OUTPUT_DIR/analysis"
-    
+
     echo ""
     echo "Evaluation complete. Results saved to: $OUTPUT_DIR/analysis"
   else

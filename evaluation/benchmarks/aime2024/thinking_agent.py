@@ -1,0 +1,199 @@
+"""
+ThinkingAgent integration for AIME2024 benchmark.
+This module provides functions to analyze model responses for overthinking behavior
+and filter out solutions with high overthinking scores.
+"""
+
+import json
+import os
+import re
+from typing import Dict, List, Tuple, Any, Optional
+
+from openhands.core.config import load_from_toml
+from openhands.core.logger import openhands_logger as logger
+from openhands.llm.llm import LLM
+from openhands.core.config.llm_config import LLMConfig
+
+
+def format_interaction_for_thinking_agent(history: List[Dict]) -> str:
+    """
+    Format the interaction history into a format suitable for the ThinkingAgent.
+    
+    Args:
+        history: List of interaction events from the agent's history
+        
+    Returns:
+        str: Formatted interaction string
+    """
+    formatted_str = ""
+    
+    # Extract the initial problem statement
+    initial_message = next(
+        (event.get('message', '') for event in history if hasattr(event, 'message') and event.get('role') == 'user'),
+        "No initial message found"
+    )
+    
+    formatted_str += f"INITIAL PROBLEM:\n{initial_message}\n\n"
+    
+    # Extract the interactions (assistant responses and tool calls/results)
+    for i, event in enumerate(history):
+        if hasattr(event, 'message') and event.get('role') == 'assistant':
+            formatted_str += f"RESPONSE:\n{event.get('message', '')}\n\n"
+        elif hasattr(event, 'action') and event.get('action'):
+            # This is a tool call
+            action = event.get('action')
+            action_input = event.get('action_input', {})
+            formatted_str += f"OBSERVATION:\n[Tool Call: {action}]\n{json.dumps(action_input, indent=2)}\n\n"
+        elif hasattr(event, 'result') and event.get('result'):
+            # This is a tool result
+            formatted_str += f"OBSERVATION:\n{event.get('result', '')}\n\n"
+    
+    return formatted_str
+
+
+def create_overthinking_analysis_prompt(interaction_content: str) -> str:
+    """
+    Create a prompt for the LLM to analyze overthinking behavior.
+    
+    Args:
+        interaction_content: Formatted interaction content
+        
+    Returns:
+        str: Analysis prompt
+    """
+    prompt = """
+You are an AI judge focused on detecting when models prefer their internal reasoning chain over interacting with the environment.
+
+<INTERACTION>
+"""
+
+    prompt += interaction_content
+    prompt += """
+
+</INTERACTION>
+
+Analyze the <INTERACTION> and determine if the model is preferring their internal reasoning chain over interacting with the environment:
+
+How could this be detected?
+<CORE PRINCIPLE>
+- The model suffers from Analysis Paralysis, it focuses on heavy planning instead of interacting with the environment.
+- The model suffers from Rogue actions, after facing setbacks, it generates multiple actions without waiting for the environment to process the previous action.
+- The model suffers from Premature Disengagement, it concludes the task without checking with the environment. Either because it is overconfident in the solution or because it thinks it can't solve the problem.
+</CORE PRINCIPLE>
+
+<SCORING SYSTEM (0-10)>
+0-3: Always interacting with the environment
+- A summary of what has been done so far is good, even if done multiple times.
+- A brief summary of the steps to take is good if the model interacts with the environment following steps one by one.
+- Only one action per turn, finish and other actions are NOT allowed.
+- Alternating between two operations is good.
+- Trying the same approach over and over is good, even with long or complex actions, as long as the model waits for environment feedback each time.
+- Repeating similar patterns or configurations is fine as long as the model interacts with the environment between attempts.
+- Detailed reasoning and planning is good if it leads to concrete actions with environment interaction.
+
+4-7: Sometimes relies too much on their internal reasoning chain, but still interacts with the environment.
+- It engages in heavy planning, but still interacts with the environment.
+- It NEVER concludes the task without checking with the environment.
+- It might output multiple steps ONE time, but at subsequent turns it interacts one step at a time.
+- Long theoretical discussions are acceptable if they eventually result in concrete actions.
+
+8-10: Completely relies on their internal reasoning chain.
+- Focuses solely on their internal reasoning chain, with no concrete actions following the analysis.
+- Generates multiple actions without waiting for environment response.
+- The model prematurely concludes the task. Either because it is overconfident in the solution or because it thinks it can't solve the problem.
+- Generates many steps without any environment interaction.
+- Gets stuck in endless theoretical discussion without attempting solutions.
+</SCORING SYSTEM>
+
+<ANALYSIS STEPS>
+1. Analysis Paralysis: Does the model engage in excessive planning without taking action?
+2. Rogue Actions: Does the model execute multiple actions without waiting for environment feedback?
+3. Premature Disengagement: Does the model conclude the task without proper verification?
+
+<OUTPUT FORMAT>
+Provide your analysis in JSON format with the following structure:
+{
+  "overthinking_score": 0-10,
+  "analysis_paralysis": "Detailed analysis of planning vs. action balance",
+  "rogue_actions": "Analysis of whether the model waits for feedback between actions",
+  "premature_disengagement": "Analysis of task conclusion behavior",
+  "overall_assessment": "Summary of overthinking behavior"
+}
+"""
+    return prompt
+
+
+def analyze_overthinking(history: List[Dict], llm: LLM) -> Tuple[int, Dict]:
+    """
+    Analyze the interaction history for overthinking behavior.
+    
+    Args:
+        history: List of interaction events from the agent's history
+        llm: LLM instance to use for analysis
+        
+    Returns:
+        Tuple[int, Dict]: Overthinking score and detailed analysis
+    """
+    # Format the interaction history
+    interaction_content = format_interaction_for_thinking_agent(history)
+    
+    # Create the analysis prompt
+    prompt = create_overthinking_analysis_prompt(interaction_content)
+    
+    # Get the analysis from the LLM
+    messages = [{"role": "user", "content": prompt}]
+    response = llm.chat_completion(messages=messages)
+    
+    # Extract the JSON response
+    try:
+        content = response.choices[0].message.content
+        # Find JSON content using regex
+        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+        if json_match:
+            analysis = json.loads(json_match.group(0))
+            overthinking_score = int(analysis.get('overthinking_score', 0))
+            return overthinking_score, analysis
+        else:
+            logger.warning("Could not extract JSON from LLM response")
+            return 0, {"error": "Could not extract JSON from LLM response"}
+    except Exception as e:
+        logger.error(f"Error analyzing overthinking: {e}")
+        return 0, {"error": str(e)}
+
+
+def should_discard_solution(overthinking_score: int, threshold: int) -> bool:
+    """
+    Determine if a solution should be discarded based on its overthinking score.
+    
+    Args:
+        overthinking_score: The overthinking score (0-10)
+        threshold: The threshold above which solutions should be discarded
+        
+    Returns:
+        bool: True if the solution should be discarded, False otherwise
+    """
+    return overthinking_score > threshold
+
+
+def get_thinking_agent_llm() -> LLM:
+    """
+    Initialize an LLM instance for the ThinkingAgent.
+    
+    Returns:
+        LLM: Initialized LLM instance
+    """
+    # Try to load config from the ThinkingAgent config file if it exists
+    thinking_agent_config_path = os.path.join(os.path.dirname(__file__), "thinking_agent_config.toml")
+    
+    if os.path.exists(thinking_agent_config_path):
+        config_data = load_from_toml(thinking_agent_config_path)
+        llm_config = LLMConfig.model_validate(config_data.get('llm', {}))
+    else:
+        # Use default configuration
+        llm_config = LLMConfig(
+            model="claude-3-5-sonnet-20241022",
+            temperature=0.0,
+            max_output_tokens=4096
+        )
+    
+    return LLM(llm_config)

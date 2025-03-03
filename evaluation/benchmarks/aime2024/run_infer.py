@@ -2,7 +2,7 @@ import asyncio
 import copy
 import os
 import re
-from typing import Optional
+from typing import Optional, Dict, List, Any
 
 import pandas as pd
 from datasets import load_dataset
@@ -12,6 +12,11 @@ from evaluation.benchmarks.aime2024.helper import (
     FAKE_RESPONSES,
     INST_SUFFIXES,
     INSTRUCTIONS_ADDENDUM,
+)
+from evaluation.benchmarks.aime2024.thinking_agent import (
+    analyze_overthinking,
+    get_thinking_agent_llm,
+    should_discard_solution,
 )
 from evaluation.utils.shared import (
     EvalMetadata,
@@ -527,6 +532,34 @@ def process_instance(
     histories = compatibility_for_eval_history_pairs(state.history)
     metrics = state.metrics.get() if state.metrics else None
 
+    # Check for overthinking if enabled in metadata
+    overthinking_threshold = metadata.details.get('overthinking_threshold', None) if metadata.details else None
+    
+    if overthinking_threshold is not None:
+        try:
+            # Initialize the ThinkingAgent LLM
+            thinking_agent_llm = get_thinking_agent_llm()
+            
+            # Analyze the solution for overthinking
+            overthinking_score, analysis = analyze_overthinking(state.history, thinking_agent_llm)
+            
+            # Add overthinking analysis to test_result
+            test_result['overthinking_score'] = overthinking_score
+            test_result['overthinking_analysis'] = analysis
+            
+            logger.info(f"Overthinking analysis completed. Score: {overthinking_score}/10")
+            
+            # Check if the solution should be discarded based on the overthinking score
+            if should_discard_solution(overthinking_score, int(overthinking_threshold)):
+                logger.warning(f"Solution discarded due to high overthinking score: {overthinking_score} > {overthinking_threshold}")
+                test_result['solution_discarded'] = True
+                test_result['is_correct'] = False  # Mark as incorrect if discarded
+            else:
+                test_result['solution_discarded'] = False
+        except Exception as e:
+            logger.error(f"Error during overthinking analysis: {e}")
+            test_result['overthinking_error'] = str(e)
+    
     # Save the output
     output = EvalOutput(
         instance_id=str(instance.instance_id),
@@ -551,6 +584,14 @@ def parse_aime2024_arguments():
         type=str,
         default='all',
         help='Comma-separated list of allowed tools for the agent. Options: all, ipython_only, bash_only, no_editor',
+    )
+    
+    # Add custom argument for overthinking threshold
+    parser.add_argument(
+        '--overthinking-threshold',
+        type=int,
+        default=None,
+        help='Threshold for overthinking score (0-10). Solutions with scores above this threshold will be discarded.',
     )
 
     return parser.parse_args()
@@ -600,6 +641,12 @@ if __name__ == '__main__':
     if metadata.details is None:
         metadata.details = {}
     metadata.details['allowed_tools'] = args.allowed_tools
+    
+    # Add the overthinking threshold if provided
+    if args.overthinking_threshold is not None:
+        metadata.details['overthinking_threshold'] = args.overthinking_threshold
+        logger.info(f'\nUsing overthinking threshold: {args.overthinking_threshold}\n')
+    
     output_file = os.path.join(metadata.eval_output_dir, 'output.jsonl')
 
     # Parse dataset IDs if provided
