@@ -341,13 +341,13 @@ def evaluate_answer(
     return results
 
 
-async def run_instance(
+async def _run_instance_async(
     instance: pd.Series,
     metadata: EvalMetadata,
     runtime: Optional[Runtime] = None,
 ) -> Dict[str, Any]:
     """
-    Run a single instance of the AIME2025 benchmark.
+    Run a single instance of the AIME2025 benchmark asynchronously.
 
     Args:
         instance: The instance to run
@@ -398,6 +398,35 @@ async def run_instance(
     }
 
     return output
+
+
+def run_instance(
+    instance: pd.Series,
+    metadata: EvalMetadata,
+    reset_logger: bool = True,
+) -> Dict[str, Any]:
+    """
+    Run a single instance of the AIME2025 benchmark.
+
+    Args:
+        instance: The instance to run
+        metadata: Evaluation metadata
+        reset_logger: Whether to reset the logger
+
+    Returns:
+        Dict[str, Any]: Results of the run
+    """
+    # Setup the logger properly, so you can run multi-processing to parallelize the evaluation
+    if reset_logger:
+        log_dir = os.path.join(metadata.eval_output_dir, 'infer_logs')
+        reset_logger_for_multiprocessing(logger, str(instance.instance_id), log_dir)
+    else:
+        logger.info(
+            f'\nStarting evaluation for instance {str(instance.instance_id)}.\n'
+        )
+    
+    # Run the instance asynchronously
+    return asyncio.run(_run_instance_async(instance, metadata))
 
 
 def load_aime2025_dataset() -> pd.DataFrame:
