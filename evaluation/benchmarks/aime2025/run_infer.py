@@ -459,15 +459,23 @@ if __name__ == '__main__':
     if llm_config is None:
         raise ValueError(f'Could not find LLM config: --llm_config {args.llm_config}')
 
+    # Create agent details dictionary
+    agent_details = {}
+    
     # Create metadata for evaluation
-    metadata = make_metadata(args)
-    metadata.llm_config = llm_config
+    metadata = make_metadata(
+        llm_config,
+        'AIME2025',
+        args.agent_cls,
+        args.max_iterations,
+        args.eval_note,
+        args.eval_output_dir,
+        details=agent_details,
+    )
     
-    # Add details to metadata if not present
-    if not hasattr(metadata, 'details'):
+    # Add the allowed_tools parameter to the metadata details
+    if metadata.details is None:
         metadata.details = {}
-    
-    # Add the allowed tools to the metadata details
     metadata.details['allowed_tools'] = args.allowed_tools
     
     # Add the overthinking threshold if provided
@@ -476,6 +484,8 @@ if __name__ == '__main__':
         metadata.details['overthinking_threshold'] = args.overthinking_threshold
         logger.info(f'\nUsing overthinking threshold: {args.overthinking_threshold}\n')
     
+    output_file = os.path.join(metadata.eval_output_dir, 'output.jsonl')
+    
     # Parse dataset IDs if provided
     eval_ids = None
     if args.eval_ids:
@@ -483,15 +493,20 @@ if __name__ == '__main__':
         logger.info(f'\nUsing specific dataset IDs: {eval_ids}\n')
     
     # Prepare the dataset for evaluation
-    df = prepare_dataset(df, args)
+    instances = prepare_dataset(
+        df,
+        output_file,
+        args.eval_n_limit,
+        eval_ids=eval_ids,
+    )
     
     # Run the evaluation
-    call_async_from_sync(
-        run_evaluation,
-        df,
+    run_evaluation(
+        instances,
         metadata,
+        output_file,
+        args.eval_num_workers,
         run_instance,
-        'AIME2025',
     )
 
 
