@@ -33,11 +33,11 @@ This is the value for the second parameter
 that can span
 multiple lines
 </parameter>
-</function>
+</tool>
 
 <IMPORTANT>
 Reminder:
-- Function calls MUST follow the specified format, start with <function= and end with </function>
+- Function calls MUST follow the specified format, start with <function= and end with </tool>
 - Required parameters MUST be specified
 - Only call one function at a time
 - You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after.
@@ -45,7 +45,7 @@ Reminder:
 </IMPORTANT>
 """
 
-STOP_WORDS = ['</function']
+STOP_WORDS = ['</tool']
 
 # NOTE: we need to make sure this example is always in-sync with the tool interface designed in openhands/agenthub/codeact_agent/function_calling.py
 IN_CONTEXT_LEARNING_EXAMPLE_PREFIX = """
@@ -65,7 +65,7 @@ First, I need to install the necessary libraries:
 import itertools
 import numpy as np
 </parameter>
-</function>
+</tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 [Jupyter current working directory: /workspace]
@@ -101,7 +101,7 @@ print(f"Possible values for a: {a_min} to {a_max}")
 print(f"For each a, possible values for b: {b_min_formula} to {b_max}")
 print(f"Total possible pairs before checking AP constraint: {total_pairs}")
 </parameter>
-</function>
+</tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 Constraints: 5 < a < b < 30
@@ -147,7 +147,7 @@ for nums, expected in test_cases:
     result = is_arithmetic_progression(nums)
     print(f"{nums}: {'is AP' if result else 'not AP'} (Expected: {'AP' if expected else 'not AP'})")
 </parameter>
-</function>
+</tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 [3, 4, 5, 6]: is AP (Expected: AP)
@@ -189,7 +189,7 @@ for a, b in test_pairs:
     ap_info = f" - AP found: {ap_found}" if invalid else ""
     print(f"Pair (a={a}, b={b}): {status}{ap_info}")
 </parameter>
-</function>
+</tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 Pair (a=6, b=7): Invalid - AP found: (3, 4, 5, 6)
@@ -240,7 +240,7 @@ print(f"Valid pairs (no AP): {valid_pairs}")
 # Verify our total matches our earlier calculation
 print(f"Verification: Total matches earlier calculation: {total_pairs == 276}")
 </parameter>
-</function>
+</tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 Total possible pairs: 276
@@ -290,7 +290,7 @@ for a, count in valid_by_a.items():
 # Verify the total again
 print(f"\nSum of valid pairs across all a values: {sum(valid_by_a.values())}")
 </parameter>
-</function>
+</tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 Pair (a=8, b=10): Valid
@@ -348,7 +348,7 @@ print("- For a=7, we have the maximum number of valid pairs (21)")
 
 print("\nTherefore, the answer is 228.")
 </parameter>
-</function>
+</tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 Summary of findings:
@@ -384,7 +384,7 @@ The answer is 228.
 
 <function=finish>
 <parameter=solution>228</parameter>
-</function>
+</tool>
 
 --------------------- END OF EXAMPLE ---------------------
 
@@ -400,11 +400,14 @@ PLEASE follow the format strictly! PLEASE EMIT ONE AND ONLY ONE FUNCTION CALL PE
 """
 
 # Regex patterns for function call parsing
-FN_REGEX_PATTERN = r'<function=([^>]+)>\n(.*?)</function>'
+FN_REGEX_PATTERN = r'<function=([^>]+)>\n(.*?)</tool>'
 FN_PARAM_REGEX_PATTERN = r'<parameter=([^>]+)>(.*?)</parameter>'
 
 # Add new regex pattern for tool execution results
 TOOL_RESULT_REGEX_PATTERN = r'EXECUTION RESULT of \[(.*?)\]:\n(.*)'
+
+# New regex pattern for the custom tool format (specifically for ipython_cell)
+IPYTHON_TOOL_REGEX_PATTERN = r'<tool=([^>]+)>\s*<code>(.*?)</code>\s*</tool>'
 
 
 def convert_tool_call_to_string(tool_call: dict) -> str:
@@ -418,7 +421,22 @@ def convert_tool_call_to_string(tool_call: dict) -> str:
     if tool_call['type'] != 'function':
         raise FunctionCallConversionError("Tool call type must be 'function'.")
 
-    ret = f"<function={tool_call['function']['name']}>\n"
+    function_name = tool_call['function']['name']
+
+    # Special handling for execute_ipython_cell
+    if function_name == 'execute_ipython_cell':
+        try:
+            args = json.loads(tool_call['function']['arguments'])
+            code_content = args.get('code', '')
+            ret = f'<tool=execute_ipython_cell>\n<code>{code_content}</code>\n</tool>'
+            return ret
+        except json.JSONDecodeError as e:
+            raise FunctionCallConversionError(
+                f"Failed to parse arguments as JSON. Arguments: {tool_call['function']['arguments']}"
+            ) from e
+
+    # Standard format for other functions
+    ret = f'<function={function_name}>\n'
     try:
         args = json.loads(tool_call['function']['arguments'])
     except json.JSONDecodeError as e:
@@ -434,7 +452,7 @@ def convert_tool_call_to_string(tool_call: dict) -> str:
         if is_multiline:
             ret += '\n'
         ret += '</parameter>\n'
-    ret += '</function>'
+    ret += '</tool>'
     return ret
 
 
@@ -744,7 +762,7 @@ def _fix_stopword(content: str) -> str:
         if content.endswith('</'):
             content = content.rstrip() + 'function>'
         else:
-            content = content + '\n</function>'
+            content = content + '\n</tool>'
     return content
 
 
@@ -858,17 +876,69 @@ def convert_non_fncall_messages_to_fncall_messages(
             if isinstance(content, str):
                 content = _fix_stopword(content)
                 fn_match = re.search(FN_REGEX_PATTERN, content, re.DOTALL)
+
+                # Check for ipython tool format
+                ipython_match = re.search(
+                    IPYTHON_TOOL_REGEX_PATTERN, content, re.DOTALL
+                )
+                if ipython_match and not fn_match:
+                    # Convert ipython tool format to function call format
+                    tool_name = ipython_match.group(1)
+                    code_content = ipython_match.group(2)
+                    # Create a synthetic function match with captured variables
+                    tool_name_captured = tool_name
+                    code_content_captured = code_content
+                    fn_match = type(
+                        'obj',
+                        (object,),
+                        {
+                            'group': lambda self,
+                            idx,
+                            tn=tool_name_captured,
+                            cc=code_content_captured: tn if idx == 1 else cc
+                        },
+                    )()
+
             elif isinstance(content, list):
                 if content and content[-1]['type'] == 'text':
                     content[-1]['text'] = _fix_stopword(content[-1]['text'])
                     fn_match = re.search(
                         FN_REGEX_PATTERN, content[-1]['text'], re.DOTALL
                     )
+
+                    # Check for ipython tool format
+                    ipython_match = re.search(
+                        IPYTHON_TOOL_REGEX_PATTERN, content[-1]['text'], re.DOTALL
+                    )
+                    if ipython_match and not fn_match:
+                        # Convert ipython tool format to function call format
+                        tool_name = ipython_match.group(1)
+                        code_content = ipython_match.group(2)
+                        # Create a synthetic function match with captured variables
+                        tool_name_captured = tool_name
+                        code_content_captured = code_content
+                        fn_match = type(
+                            'obj',
+                            (object,),
+                            {
+                                'group': lambda self,
+                                idx,
+                                tn=tool_name_captured,
+                                cc=code_content_captured: tn if idx == 1 else cc
+                            },
+                        )()
                 else:
                     fn_match = None
+
+                # Check for function call pattern in any text item
                 fn_match_exists = any(
                     item.get('type') == 'text'
-                    and re.search(FN_REGEX_PATTERN, item['text'], re.DOTALL)
+                    and (
+                        re.search(FN_REGEX_PATTERN, item['text'], re.DOTALL)
+                        or re.search(
+                            IPYTHON_TOOL_REGEX_PATTERN, item['text'], re.DOTALL
+                        )
+                    )
                     for item in content
                 )
                 if fn_match_exists and not fn_match:
