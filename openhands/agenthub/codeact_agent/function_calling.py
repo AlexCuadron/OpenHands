@@ -67,26 +67,31 @@ def response_to_actions(response: ModelResponse, agent=None) -> list[Action]:
             if (
                 hasattr(assistant_msg, 'content')
                 and assistant_msg.content
-                and '<function=' in assistant_msg.content
+                and ('<function=' in assistant_msg.content or '<tool=' in assistant_msg.content)
             ):
                 import re
 
-                function_match = re.search(r'<function=([^>]+)>', assistant_msg.content)
-                if function_match and function_match.group(1) == 'execute_ipython_cell':
-                    # This is likely a case where the model is trying to call execute_ipython_cell
-                    # Extract the code parameter
-                    code_match = re.search(
-                        r'<parameter=code>(.*?)</parameter>',
-                        assistant_msg.content,
-                        re.DOTALL,
-                    )
-                    if code_match:
-                        code = code_match.group(1)
-                        logger.info(
-                            'Extracted code from content and creating IPythonRunCellAction'
+                # Try to match both <function=...> and <tool=...> formats
+                function_match = re.search(r'<function=([^>]+)>|<tool=([^>]+)>', assistant_msg.content)
+                if function_match:
+                    # Get the function/tool name from whichever group matched
+                    function_name = function_match.group(1) if function_match.group(1) else function_match.group(2)
+                    if function_name == 'execute_ipython_cell':
+                        # This is likely a case where the model is trying to call execute_ipython_cell
+                        # Try to extract the code parameter using both formats
+                        code_match = re.search(
+                            r'<parameter=code>(.*?)</parameter>|<code>(.*?)</code>',
+                            assistant_msg.content,
+                            re.DOTALL,
                         )
-                        actions.append(IPythonRunCellAction(code=code))
-                        return actions
+                        if code_match:
+                            # Get the code from whichever group matched
+                            code = code_match.group(1) if code_match.group(1) else code_match.group(2)
+                            logger.info(
+                                'Extracted code from content and creating IPythonRunCellAction'
+                            )
+                            actions.append(IPythonRunCellAction(code=code))
+                            return actions
 
     assert len(response.choices) == 1, 'Only one choice is supported for now'
     choice = response.choices[0]
