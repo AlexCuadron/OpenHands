@@ -10,10 +10,20 @@ repo_root = Path(__file__).parent.parent.parent.parent
 sys.path.append(str(repo_root))
 
 # Import the custom provider to register it
-from openhands.custom_qwen_provider import custom_qwen_completion
+try:
+    from openhands.custom_qwen_provider import custom_qwen_completion
+    print("Successfully imported custom_qwen_provider")
+except Exception as e:
+    print(f"Error importing custom_qwen_provider: {e}")
+    print("Continuing without custom provider...")
 
 # Import the run_infer module
-from evaluation.benchmarks.aime2025.run_infer import main as run_infer_main
+try:
+    from evaluation.benchmarks.aime2025.run_infer import main as run_infer_main
+    print("Successfully imported run_infer_main")
+except Exception as e:
+    print(f"Error importing run_infer_main: {e}")
+    sys.exit(1)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run AIME2025 benchmark with custom Qwen provider")
@@ -45,4 +55,10 @@ if __name__ == "__main__":
     ]
     
     # Run the benchmark
-    run_infer_main()
+    try:
+        run_infer_main()
+    except Exception as e:
+        print(f"Error running benchmark: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)

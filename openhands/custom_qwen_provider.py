@@ -57,4 +57,19 @@ def custom_qwen_completion(
     return response
 
 # Register our custom provider with LiteLLM
-litellm.register_provider("custom_qwen", custom_qwen_completion)
+try:
+    if hasattr(litellm, 'register_provider'):
+        litellm.register_provider("custom_qwen", custom_qwen_completion)
+    else:
+        print("litellm.register_provider is not available. Using a workaround.")
+        # Workaround: Monkey patch litellm.completion for custom_qwen provider
+        original_completion = litellm.completion
+        
+        def patched_completion(*args, **kwargs):
+            if kwargs.get('custom_llm_provider') == 'custom_qwen':
+                return custom_qwen_completion(*args, **kwargs)
+            return original_completion(*args, **kwargs)
+        
+        litellm.completion = patched_completion
+except Exception as e:
+    print(f"Failed to register custom_qwen provider: {e}")
