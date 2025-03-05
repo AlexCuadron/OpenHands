@@ -26,18 +26,18 @@ You have access to the following tools:
 
 If you choose to call a tool ONLY reply in the following format with NO suffix:
 
-<tool=example_tool_name>
-<example_parameter_1>value_1</example_parameter_1>
-<example_parameter_2>
+<function=example_tool_name>
+<parameter=example_parameter_1>value_1</parameter>
+<parameter=example_parameter_2>
 This is the value for the second parameter
 that can span
 multiple lines
-</example_parameter_2>
-</tool>
+</parameter>
+</function>
 
 <IMPORTANT>
 Reminder:
-- Tool calls MUST follow the specified format, start with <tool= and end with </tool>
+- Tool calls MUST follow the specified format, start with <function= and end with </function>
 - Required parameters MUST be specified
 - Only call one tool at a time
 - You may provide optional reasoning for your tool call in natural language BEFORE the tool call, but NOT after.
@@ -45,7 +45,7 @@ Reminder:
 </IMPORTANT>
 """
 
-STOP_WORDS = ['</tool']
+STOP_WORDS = ['</function']
 
 # NOTE: we need to make sure this example is always in-sync with the tool interface designed in openhands/agenthub/codeact_agent/function_calling.py
 IN_CONTEXT_LEARNING_EXAMPLE_PREFIX = """
@@ -59,8 +59,8 @@ ASSISTANT: I'll solve this problem by breaking it down into sub-problems and usi
 
 First, I need to install the necessary libraries:
 
-<tool=execute_ipython_cell>
-<code>
+<function=execute_ipython_cell>
+<parameter=code>
 import numpy as np
 import math
 
@@ -78,8 +78,8 @@ try:
     print(f"θ = arctan({y}/{x}) = {theta_standard} radians")
 except ZeroDivisionError:
     print(f"Error: Division by zero when calculating arctan({y}/{x})")
-</code>
-</tool>
+</parameter>
+</function>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 [Jupyter current working directory: /workspace]
@@ -94,8 +94,8 @@ Sub-problem 4: Count all valid pairs by checking each possible (a,b) combination
 
 Let me start with sub-problem 1:
 
-<tool=execute_ipython_cell>
-<code>
+<function=execute_ipython_cell>
+<parameter=code>
 import numpy as np
 
 # For the sequence [3, 4, 5, a, b, 30, 40, 50] to be strictly increasing:
@@ -113,8 +113,8 @@ if theta < 0:
     print(f"Adjusted θ to be in [0, 2π) range: {theta} radians")
 else:
     print(f"θ is already in [0, 2π) range: {theta} radians")
-</code>
-</tool>
+</parameter>
+</function>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 Constraints: 5 < a < b < 30
@@ -126,8 +126,8 @@ Total possible pairs before checking AP constraint: 276
 
 ASSISTANT: Now I'll tackle sub-problem 2 - defining a function to check if four numbers form an arithmetic progression:
 
-<tool=execute_ipython_cell>
-<code>
+<function=execute_ipython_cell>
+<parameter=code>
 import numpy as np
 
 def is_arithmetic_progression(numbers):
@@ -148,8 +148,8 @@ def is_arithmetic_progression(numbers):
     # Check for numerical precision issues
     if abs(x_back) < 1e-10:
         print("x is effectively zero (within numerical precision)")
-</code>
-</tool>
+</parameter>
+</function>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 [3, 4, 5, 6]: is AP (Expected: AP)
@@ -162,8 +162,8 @@ USER: EXECUTION RESULT of [execute_ipython_cell]:
 
 ASSISTANT: Now for sub-problem 3, I'll identify some specific invalid pairs (a,b) that create arithmetic progressions:
 
-<tool=execute_ipython_cell>
-<code>
+<function=execute_ipython_cell>
+<parameter=code>
 import numpy as np
 
 def check_invalid_pair(a, b):
@@ -178,8 +178,8 @@ def check_invalid_pair(a, b):
 
 # Express in terms of π for mathematical notation
 print(f"θ = {theta/pi}π radians")
-</code>
-</tool>
+</parameter>
+</function>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 Pair (a=6, b=7): Invalid - AP found: (3, 4, 5, 6)
@@ -192,8 +192,8 @@ Pair (a=8, b=9): Valid
 
 ASSISTANT: Now I'll solve sub-problem 4 by counting all valid pairs. Since there are 276 possible pairs to check, I'll implement an efficient algorithm:
 
-<tool=execute_ipython_cell>
-<code>
+<function=execute_ipython_cell>
+<parameter=code>
 # Sub-problem 4: Count all valid pairs by checking each possible (a,b) combination
 
 def count_valid_pairs():
@@ -229,8 +229,8 @@ print(f"Valid pairs (no AP): {valid_pairs}")
 
 # Verify our total matches our earlier calculation
 print(f"Verification: Total matches earlier calculation: {total_pairs == 276}")
-</code>
-</tool>
+</parameter>
+</function>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 Total possible pairs: 276
@@ -242,8 +242,8 @@ Verification: Total matches earlier calculation: True
 
 ASSISTANT: Let me verify the result by checking a few more specific cases to make sure our algorithm is correct:
 
-<tool=execute_ipython_cell>
-<code>
+<function=execute_ipython_cell>
+<parameter=code>
 # Verify our result with additional test cases
 
 # Let's check a few more pairs that should be valid
@@ -279,8 +279,8 @@ for a, count in valid_by_a.items():
 
 # Verify the total again
 print(f"\nSum of valid pairs across all a values: {sum(valid_by_a.values())}")
-</code>
-</tool>
+</parameter>
+</function>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 Pair (a=8, b=10): Valid
@@ -318,8 +318,8 @@ Sum of valid pairs across all a values: 228
 
 ASSISTANT: Now I'll combine the results from all sub-problems to determine the final answer:
 
-<tool=execute_ipython_cell>
-<code>
+<function=execute_ipython_cell>
+<parameter=code>
 # Combining results from all sub-problems
 
 print("Summary of findings:")
@@ -337,8 +337,8 @@ print("- The number of valid pairs decreases linearly as a increases")
 print("- For a=7, we have the maximum number of valid pairs (21)")
 
 print("\nTherefore, the answer is 228.")
-</code>
-</tool>
+</parameter>
+</function>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 Summary of findings:
@@ -372,9 +372,9 @@ ASSISTANT: I've solved this problem by breaking it down into sub-problems and us
 
 The answer is 228.
 
-<tool=finish>
-<solution>\\boxed{(3, \\frac{\\pi}{2})}</solution>
-</tool>
+<function=finish>
+<parameter=solution>\\boxed{(3, \\frac{\\pi}{2})}</parameter>
+</function>
 
 --------------------- END OF EXAMPLE ---------------------
 
@@ -390,7 +390,7 @@ I'll solve this step-by-step using the available tools.
 """
 
 # Regex patterns for extracting function calls
-FN_CALL_REGEX_PATTERN = r'<tool=([^>]+)>(.*?)</tool>'
+FN_CALL_REGEX_PATTERN = r'<function=([^>]+)>(.*?)</function>'
 FN_PARAM_REGEX_PATTERN = r'<([^>]+)>(.*?)</\1>'
 
 
