@@ -47,6 +47,7 @@ bash evaluation/benchmarks/aime2025/scripts/run_infer.sh togetherDeepseek HEAD C
 6. `EVAL_IDS`: Comma-separated list of example IDs to evaluate (default: "" for full benchmark, "0" for example)
 7. `RUN_EVALUATION`: Set to "eval" to run evaluation after benchmark
 8. `ALLOWED_TOOLS`: Tools allowed for the agent (default: "all")
+9. `USE_PREFIX`: Whether to use the prefix-based LLM approach (default: "true")
 
 ## Analyzing Results
 
@@ -101,3 +102,63 @@ Here's an example problem from the dataset:
 > Find the sum of all integer bases $b>9$ for which $17_{b}$ is a divisor of $97_{b}$.
 
 The correct answer is 70.
+
+# Prefix-Based LLM Approach
+
+This benchmark includes a special feature that uses a prefix-based LLM approach, where the assistant's previous responses and observations are combined into a growing narrative that's included as a prefix in subsequent turns.
+
+## Running with Prefix-Based LLM
+
+To run the benchmark with the prefix-based LLM approach (default):
+
+```bash
+./evaluation/benchmarks/aime2025/scripts/run_infer.sh limo HEAD CodeActAgent 1 1 "" eval ipython_only
+```
+
+To run the benchmark without the prefix-based LLM approach:
+
+```bash
+./evaluation/benchmarks/aime2025/scripts/run_infer.sh limo HEAD CodeActAgent 1 1 "" eval ipython_only false
+```
+
+## How Prefix-Based LLM Works
+
+The prefix-based LLM approach is implemented in the `conditional_prefix_llm.py` module. It works by:
+
+1. Detecting if we're running the AIME2025 benchmark
+2. If so, using the PrefixLLM class instead of the standard LLM class
+3. The PrefixLLM class transforms messages into a prefix-based format where the assistant's previous responses and observations are combined into a growing narrative that's included as a prefix in subsequent turns
+
+This approach is particularly useful for models that support the `prefix` parameter (like DeepSeek) and for creating a more coherent conversation flow.
+
+## Example
+
+Original messages:
+```json
+[
+  {"role": "system", "content": "You are a helpful assistant."},
+  {"role": "user", "content": "Who won the world cup in 2022?"},
+  {"role": "assistant", "content": "Let me check <tool>get_world_cup_winner(2022)</tool>"},
+  {"role": "tool", "content": "Argentina"},
+  {"role": "user", "content": "What was the score?"}
+]
+```
+
+Transformed messages with prefix-based approach:
+```json
+[
+  {
+    "role": "user",
+    "content": "You are a helpful assistant.\n\nWho won the world cup in 2022?"
+  },
+  {
+    "role": "assistant",
+    "content": "Let me check <tool>get_world_cup_winner(2022)</tool>\nObservation: Argentina",
+    "prefix": true
+  },
+  {
+    "role": "user",
+    "content": "What was the score?"
+  }
+]
+```
