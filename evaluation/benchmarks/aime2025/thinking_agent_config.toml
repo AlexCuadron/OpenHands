@@ -1,0 +1,5 @@
+[llm]
+provider = "together"
+model = "togethercomputer/llama-3-8b-instruct"
+temperature = 0.0
+max_tokens = 1024
