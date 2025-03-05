@@ -54,57 +54,54 @@ def combine_thought(action: Action, thought: str) -> Action:
 
 def response_to_actions(response: ModelResponse, agent=None) -> list[Action]:
     actions: list[Action] = []
-
-    # Check if this is a case where the model is trying to call execute_ipython_cell
-    # but the system is trying to interpret it as a finish function call
-    if hasattr(response, 'error') and 'Missing required parameters for function' in str(
-        response.error
-    ):
+    
+    # First, check if we can directly extract an execute_ipython_cell call from the content
+    # This is a common operation and we want to handle it directly before any complex parsing
+    if hasattr(response, 'choices') and len(response.choices) > 0:
+        assistant_msg = response.choices[0].message
+        if hasattr(assistant_msg, 'content') and assistant_msg.content:
+            content = assistant_msg.content
+            import re
+            
+            # Direct pattern match for IPython cell execution
+            ipython_pattern = r'<function=execute_ipython_cell>.*?<parameter=code>(.*?)</parameter>.*?</function>'
+            ipython_match = re.search(ipython_pattern, content, re.DOTALL)
+            
+            if ipython_match:
+                # We found a direct match for execute_ipython_cell
+                code = ipython_match.group(1)
+                logger.info('Directly extracted IPython code from content')
+                actions.append(IPythonRunCellAction(code=code))
+                return actions
+            
+            # Fallback: Check if there's a code parameter anywhere in the content
+            # This is a strong indicator of an execute_ipython_cell call even if malformed
+            if '<parameter=code>' in content:
+                code_match = re.search(r'<parameter=code>(.*?)</parameter>', content, re.DOTALL)
+                if code_match:
+                    code = code_match.group(1)
+                    logger.info('Found code parameter in content, creating IPythonRunCellAction')
+                    actions.append(IPythonRunCellAction(code=code))
+                    return actions
+    
+    # If we get here and there's an error about missing parameters, try to recover
+    if hasattr(response, 'error') and 'Missing required parameters for function' in str(response.error):
         logger.warning(f'Detected error in function call: {response.error}')
         # Try to extract the actual function call from the content
         if hasattr(response, 'choices') and len(response.choices) > 0:
             assistant_msg = response.choices[0].message
-            if (
-                hasattr(assistant_msg, 'content')
-                and assistant_msg.content
-            ):
+            if hasattr(assistant_msg, 'content') and assistant_msg.content:
                 import re
                 
-                # First, check if there's a code parameter anywhere in the content
-                # This is a strong indicator of an execute_ipython_cell call
-                code_match = re.search(
-                    r'<parameter=code>(.*?)</parameter>',
-                    assistant_msg.content,
-                    re.DOTALL,
-                )
+                # Check for function name and code parameter
+                function_match = re.search(r'<function=([^>]+)>', assistant_msg.content)
+                code_match = re.search(r'<parameter=code>(.*?)</parameter>', assistant_msg.content, re.DOTALL)
                 
-                if code_match:
-                    # We found a code parameter, this is likely an execute_ipython_cell call
+                if function_match and function_match.group(1) == 'execute_ipython_cell' and code_match:
                     code = code_match.group(1)
-                    logger.info(
-                        'Found code parameter in content, assuming execute_ipython_cell and creating IPythonRunCellAction'
-                    )
+                    logger.info('Recovered IPython code from error state')
                     actions.append(IPythonRunCellAction(code=code))
                     return actions
-                
-                # If we didn't find a code parameter, check for an explicit function name
-                if '<function=' in assistant_msg.content:
-                    function_match = re.search(r'<function=([^>]+)>', assistant_msg.content)
-                    if function_match and function_match.group(1) == 'execute_ipython_cell':
-                        # This is explicitly an execute_ipython_cell call
-                        # Extract the code parameter
-                        code_match = re.search(
-                            r'<parameter=code>(.*?)</parameter>',
-                            assistant_msg.content,
-                            re.DOTALL,
-                        )
-                        if code_match:
-                            code = code_match.group(1)
-                            logger.info(
-                                'Extracted code from content and creating IPythonRunCellAction'
-                            )
-                            actions.append(IPythonRunCellAction(code=code))
-                            return actions
 
     assert len(response.choices) == 1, 'Only one choice is supported for now'
     choice = response.choices[0]

@@ -863,20 +863,44 @@ def convert_non_fncall_messages_to_fncall_messages(
         elif role == 'assistant':
             if isinstance(content, str):
                 content = _fix_stopword(content)
-                fn_match = re.search(FN_REGEX_PATTERN, content, re.DOTALL)
+                # First check for IPython cell execution specifically
+                ipython_pattern = r'<function=execute_ipython_cell>.*?<parameter=code>(.*?)</parameter>.*?</function>'
+                ipython_match = re.search(ipython_pattern, content, re.DOTALL)
+                if ipython_match:
+                    # This is an IPython cell execution, handle it specially
+                    fn_match = re.search(r'<function=(execute_ipython_cell)>', content, re.DOTALL)
+                else:
+                    # Regular function call pattern
+                    fn_match = re.search(FN_REGEX_PATTERN, content, re.DOTALL)
             elif isinstance(content, list):
                 if content and content[-1]['type'] == 'text':
                     content[-1]['text'] = _fix_stopword(content[-1]['text'])
-                    fn_match = re.search(
-                        FN_REGEX_PATTERN, content[-1]['text'], re.DOTALL
-                    )
+                    
+                    # First check for IPython cell execution specifically
+                    ipython_pattern = r'<function=execute_ipython_cell>.*?<parameter=code>(.*?)</parameter>.*?</function>'
+                    ipython_match = re.search(ipython_pattern, content[-1]['text'], re.DOTALL)
+                    if ipython_match:
+                        # This is an IPython cell execution, handle it specially
+                        fn_match = re.search(r'<function=(execute_ipython_cell)>', content[-1]['text'], re.DOTALL)
+                    else:
+                        # Regular function call pattern
+                        fn_match = re.search(
+                            FN_REGEX_PATTERN, content[-1]['text'], re.DOTALL
+                        )
                 else:
                     fn_match = None
+                    ipython_match = None
+                
+                # Check if any item has a function call
                 fn_match_exists = any(
                     item.get('type') == 'text'
-                    and re.search(FN_REGEX_PATTERN, item['text'], re.DOTALL)
+                    and (
+                        re.search(FN_REGEX_PATTERN, item['text'], re.DOTALL)
+                        or re.search(r'<function=execute_ipython_cell>', item['text'], re.DOTALL)
+                    )
                     for item in content
                 )
+                
                 if fn_match_exists and not fn_match:
                     raise FunctionCallConversionError(
                         f'Expecting function call in the LAST index of content list. But got content={content}'
@@ -888,7 +912,43 @@ def convert_non_fncall_messages_to_fncall_messages(
 
             if fn_match:
                 fn_name = fn_match.group(1)
-                fn_body = fn_match.group(2)
+                
+                # Special handling for IPython cell execution
+                if fn_name == 'execute_ipython_cell':
+                    # Extract code parameter directly
+                    code_match = re.search(r'<parameter=code>(.*?)</parameter>', 
+                                          content if isinstance(content, str) else content[-1]['text'], 
+                                          re.DOTALL)
+                    if code_match:
+                        # Create tool call with unique ID
+                        tool_call_id = f'toolu_{tool_call_counter:02d}'
+                        tool_call = {
+                            'index': 1,
+                            'id': tool_call_id,
+                            'type': 'function',
+                            'function': {
+                                'name': 'execute_ipython_cell', 
+                                'arguments': json.dumps({'code': code_match.group(1)})
+                            },
+                        }
+                        tool_call_counter += 1
+                        
+                        # Remove the function call part from content
+                        if isinstance(content, list):
+                            assert content and content[-1]['type'] == 'text'
+                            content[-1]['text'] = (
+                                content[-1]['text'].split('<function=')[0].strip()
+                            )
+                        elif isinstance(content, str):
+                            content = content.split('<function=')[0].strip()
+                            
+                        converted_messages.append(
+                            {'role': 'assistant', 'content': content, 'tool_calls': [tool_call]}
+                        )
+                        continue
+                
+                # Regular function call processing
+                fn_body = fn_match.group(2) if len(fn_match.groups()) > 1 else ""
                 matching_tool = next(
                     (
                         tool['function']
@@ -900,6 +960,40 @@ def convert_non_fncall_messages_to_fncall_messages(
                 )
                 # Validate function exists in tools
                 if not matching_tool:
+                    # Special case: If we see a code parameter, this might be an execute_ipython_cell call
+                    if '<parameter=code>' in (content if isinstance(content, str) else content[-1]['text']):
+                        code_match = re.search(r'<parameter=code>(.*?)</parameter>', 
+                                              content if isinstance(content, str) else content[-1]['text'], 
+                                              re.DOTALL)
+                        if code_match:
+                            # Create tool call for execute_ipython_cell
+                            tool_call_id = f'toolu_{tool_call_counter:02d}'
+                            tool_call = {
+                                'index': 1,
+                                'id': tool_call_id,
+                                'type': 'function',
+                                'function': {
+                                    'name': 'execute_ipython_cell', 
+                                    'arguments': json.dumps({'code': code_match.group(1)})
+                                },
+                            }
+                            tool_call_counter += 1
+                            
+                            # Remove the function call part from content
+                            if isinstance(content, list):
+                                assert content and content[-1]['type'] == 'text'
+                                content[-1]['text'] = (
+                                    content[-1]['text'].split('<parameter=code>')[0].strip()
+                                )
+                            elif isinstance(content, str):
+                                content = content.split('<parameter=code>')[0].strip()
+                                
+                            converted_messages.append(
+                                {'role': 'assistant', 'content': content, 'tool_calls': [tool_call]}
+                            )
+                            continue
+                    
+                    # If we get here, it's a genuine error
                     raise FunctionCallValidationError(
                         f"Function '{fn_name}' not found in available tools: {[tool['function']['name'] for tool in tools if tool['type'] == 'function']}"
                     )
