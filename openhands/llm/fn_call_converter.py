@@ -390,7 +390,7 @@ I'll solve this step-by-step using the available tools.
 
 # Regex patterns for extracting function calls
 FN_CALL_REGEX_PATTERN = r'<tool=([^>]+)>(.*?)</tool>'
-FN_PARAM_REGEX_PATTERN = r'<([^>]+)>(.*?)</\1>'
+FN_PARAM_REGEX_PATTERN = r'<(?!tool=)([^>]+)>(.*?)</\1>'
 
 
 def _extract_and_validate_params(
