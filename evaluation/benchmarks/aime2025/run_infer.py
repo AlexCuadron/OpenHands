@@ -591,8 +591,15 @@ def parse_aime2025_arguments():
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+def main():
+    """Main entry point for the AIME2025 benchmark."""
     args = parse_aime2025_arguments()
+    
+    # The rest of the code will be executed when this function is called
+    return args
+
+if __name__ == '__main__':
+    args = main()
 
     # Load the AIME2025 dataset
     # Combine both AIME2025-I and AIME2025-II datasets
