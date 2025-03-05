@@ -732,6 +732,12 @@ def _extract_and_validate_params(
     # Check all required parameters are present
     missing_params = required_params - found_params
     if missing_params:
+        # Special case: If this looks like an execute_ipython_cell call but is being interpreted as something else
+        if 'code' in found_params and fn_name != 'execute_ipython_cell':
+            # This might be an execute_ipython_cell call being misinterpreted
+            import logging
+            logging.warning(f"Possible misinterpretation: Found 'code' parameter but function name is '{fn_name}'. This might be an execute_ipython_cell call.")
+            # We'll still raise the error, but the function_calling.py will catch and handle it
         raise FunctionCallValidationError(
             f"Missing required parameters for function '{fn_name}': {missing_params}"
         )

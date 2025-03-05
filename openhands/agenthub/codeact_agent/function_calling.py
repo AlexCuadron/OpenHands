@@ -67,26 +67,44 @@ def response_to_actions(response: ModelResponse, agent=None) -> list[Action]:
             if (
                 hasattr(assistant_msg, 'content')
                 and assistant_msg.content
-                and '<function=' in assistant_msg.content
             ):
                 import re
-
-                function_match = re.search(r'<function=([^>]+)>', assistant_msg.content)
-                if function_match and function_match.group(1) == 'execute_ipython_cell':
-                    # This is likely a case where the model is trying to call execute_ipython_cell
-                    # Extract the code parameter
-                    code_match = re.search(
-                        r'<parameter=code>(.*?)</parameter>',
-                        assistant_msg.content,
-                        re.DOTALL,
+                
+                # First, check if there's a code parameter anywhere in the content
+                # This is a strong indicator of an execute_ipython_cell call
+                code_match = re.search(
+                    r'<parameter=code>(.*?)</parameter>',
+                    assistant_msg.content,
+                    re.DOTALL,
+                )
+                
+                if code_match:
+                    # We found a code parameter, this is likely an execute_ipython_cell call
+                    code = code_match.group(1)
+                    logger.info(
+                        'Found code parameter in content, assuming execute_ipython_cell and creating IPythonRunCellAction'
                     )
-                    if code_match:
-                        code = code_match.group(1)
-                        logger.info(
-                            'Extracted code from content and creating IPythonRunCellAction'
+                    actions.append(IPythonRunCellAction(code=code))
+                    return actions
+                
+                # If we didn't find a code parameter, check for an explicit function name
+                if '<function=' in assistant_msg.content:
+                    function_match = re.search(r'<function=([^>]+)>', assistant_msg.content)
+                    if function_match and function_match.group(1) == 'execute_ipython_cell':
+                        # This is explicitly an execute_ipython_cell call
+                        # Extract the code parameter
+                        code_match = re.search(
+                            r'<parameter=code>(.*?)</parameter>',
+                            assistant_msg.content,
+                            re.DOTALL,
                         )
-                        actions.append(IPythonRunCellAction(code=code))
-                        return actions
+                        if code_match:
+                            code = code_match.group(1)
+                            logger.info(
+                                'Extracted code from content and creating IPythonRunCellAction'
+                            )
+                            actions.append(IPythonRunCellAction(code=code))
+                            return actions
 
     assert len(response.choices) == 1, 'Only one choice is supported for now'
     choice = response.choices[0]
