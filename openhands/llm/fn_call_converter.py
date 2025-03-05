@@ -1,7 +1,7 @@
-"""Convert function calling messages to non-function calling messages and vice versa.
+"""Convert tool calling messages to non-tool calling messages and vice versa.
 
-This will inject prompts so that models that doesn't support function calling
-can still be used with function calling agents.
+This will inject prompts so that models that doesn't support tool calling
+can still be used with tool calling agents.
 
 We follow format from: https://docs.litellm.ai/docs/completion/function_call
 """
@@ -233,7 +233,7 @@ IN_CONTEXT_LEARNING_EXAMPLE_SUFFIX = """
 PLEASE follow the format strictly! PLEASE EMIT ONE AND ONLY ONE FUNCTION CALL PER MESSAGE.
 """
 
-# Regex patterns for function call parsing
+# Regex patterns for tool call parsing
 FN_REGEX_PATTERN = r'<tool=([^>]+)>\n(.*?)</tool>'
 FN_PARAM_REGEX_PATTERN = r'<(?!tool=)([^>]+)>(.*?)</\1>'
 
@@ -311,12 +311,12 @@ def convert_tools_to_description(tools: list[dict]) -> str:
     return ret
 
 
-def convert_fncall_messages_to_non_fncall_messages(
+def convert_tool_messages_to_non_tool_messages(
     messages: list[dict],
     tools: list[ChatCompletionToolParam],
     add_in_context_learning_example: bool = True,
 ) -> list[dict]:
-    """Convert function calling messages to non-function calling messages."""
+    """Convert tool calling messages to non-tool calling messages."""
     messages = copy.deepcopy(messages)
 
     formatted_tools = convert_tools_to_description(tools)
@@ -578,11 +578,11 @@ def _fix_stopword(content: str) -> str:
     return content
 
 
-def convert_non_fncall_messages_to_fncall_messages(
+def convert_non_tool_messages_to_tool_messages(
     messages: list[dict],
     tools: list[ChatCompletionToolParam],
 ) -> list[dict]:
-    """Convert non-function calling messages back to function calling messages."""
+    """Convert non-tool calling messages back to tool calling messages."""
     messages = copy.deepcopy(messages)
     formatted_tools = convert_tools_to_description(tools)
     system_prompt_suffix = SYSTEM_PROMPT_SUFFIX_TEMPLATE.format(
@@ -687,51 +687,51 @@ def convert_non_fncall_messages_to_fncall_messages(
         elif role == 'assistant':
             if isinstance(content, str):
                 content = _fix_stopword(content)
-                fn_match = re.search(FN_REGEX_PATTERN, content, re.DOTALL)
+                tool_match = re.search(FN_REGEX_PATTERN, content, re.DOTALL)
             elif isinstance(content, list):
                 if content and content[-1]['type'] == 'text':
                     content[-1]['text'] = _fix_stopword(content[-1]['text'])
-                    fn_match = re.search(
+                    tool_match = re.search(
                         FN_REGEX_PATTERN, content[-1]['text'], re.DOTALL
                     )
                 else:
-                    fn_match = None
-                fn_match_exists = any(
+                    tool_match = None
+                tool_match_exists = any(
                     item.get('type') == 'text'
                     and re.search(FN_REGEX_PATTERN, item['text'], re.DOTALL)
                     for item in content
                 )
-                if fn_match_exists and not fn_match:
+                if tool_match_exists and not tool_match:
                     raise FunctionCallConversionError(
-                        f'Expecting function call in the LAST index of content list. But got content={content}'
+                        f'Expecting tool call in the LAST index of content list. But got content={content}'
                     )
             else:
                 raise FunctionCallConversionError(
                     f'Unexpected content type {type(content)}. Expected str or list. Content: {content}'
                 )
 
-            if fn_match:
-                fn_name = fn_match.group(1)
-                fn_body = fn_match.group(2)
+            if tool_match:
+                tool_name = tool_match.group(1)
+                tool_body = tool_match.group(2)
                 matching_tool = next(
                     (
                         tool['function']
                         for tool in tools
                         if tool['type'] == 'function'
-                        and tool['function']['name'] == fn_name
+                        and tool['function']['name'] == tool_name
                     ),
                     None,
                 )
                 # Validate function exists in tools
                 if not matching_tool:
                     raise FunctionCallValidationError(
-                        f"Function '{fn_name}' not found in available tools: {[tool['function']['name'] for tool in tools if tool['type'] == 'function']}"
+                        f"Tool '{tool_name}' not found in available tools: {[tool['function']['name'] for tool in tools if tool['type'] == 'function']}"
                     )
 
                 # Parse parameters
-                param_matches = re.finditer(FN_PARAM_REGEX_PATTERN, fn_body, re.DOTALL)
+                param_matches = re.finditer(FN_PARAM_REGEX_PATTERN, tool_body, re.DOTALL)
                 params = _extract_and_validate_params(
-                    matching_tool, param_matches, fn_name
+                    matching_tool, param_matches, tool_name
                 )
 
                 # Create tool call with unique ID
@@ -740,7 +740,7 @@ def convert_non_fncall_messages_to_fncall_messages(
                     'index': 1,  # always 1 because we only support **one tool call per message**
                     'id': tool_call_id,
                     'type': 'function',
-                    'function': {'name': fn_name, 'arguments': json.dumps(params)},
+                    'function': {'name': tool_name, 'arguments': json.dumps(params)},
                 }
                 tool_call_counter += 1  # Increment counter
 
@@ -766,7 +766,7 @@ def convert_non_fncall_messages_to_fncall_messages(
 
         else:
             raise FunctionCallConversionError(
-                f'Unexpected role {role}. Expected system, user, or assistant in non-function calling messages.'
+                f'Unexpected role {role}. Expected system, user, or assistant in non-tool calling messages.'
             )
     return converted_messages
 
