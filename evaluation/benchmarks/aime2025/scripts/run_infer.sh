@@ -60,7 +60,16 @@ echo "MODEL_CONFIG: $MODEL_CONFIG"
 
 EVAL_NOTE=$OPENHANDS_VERSION
 
-COMMAND="export PYTHONPATH=evaluation/benchmarks/aime2025:\$PYTHONPATH && poetry run python evaluation/benchmarks/aime2025/run_infer.py \
+# Check if Docker is available
+if command -v docker &> /dev/null && docker info &> /dev/null; then
+  echo "Docker is available, using Docker runtime"
+  RUNTIME="docker"
+else
+  echo "Docker is not available, falling back to local runtime"
+  RUNTIME="local"
+fi
+
+COMMAND="export PYTHONPATH=evaluation/benchmarks/aime2025:\$PYTHONPATH && RUNTIME=$RUNTIME poetry run python evaluation/benchmarks/aime2025/run_infer.py \
   --agent-cls $AGENT \
   --llm-config $MODEL_CONFIG \
   --max-iterations 30 \

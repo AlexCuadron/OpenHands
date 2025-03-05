@@ -18,6 +18,12 @@ if [ ! -f "$OUTPUT_FILE" ]; then
   exit 1
 fi
 
+# Check if the file is empty
+if [ ! -s "$OUTPUT_FILE" ]; then
+  echo "Error: Output file is empty: $OUTPUT_FILE"
+  exit 1
+fi
+
 # If no output directory is specified, use the directory of the output file
 if [ -z "$OUTPUT_DIR" ]; then
   OUTPUT_DIR="$(dirname "$OUTPUT_FILE")/analysis"
@@ -28,6 +34,12 @@ mkdir -p "$OUTPUT_DIR"
 
 echo "Analyzing results in: $OUTPUT_FILE"
 echo "Saving analysis to: $OUTPUT_DIR"
+
+# Check if required Python packages are installed
+if ! python -c "import pandas, matplotlib" &> /dev/null; then
+  echo "Installing required Python packages..."
+  pip install pandas matplotlib
+fi
 
 # Run the analysis script
 poetry run python evaluation/benchmarks/aime2025/scripts/analyze_results.py "$OUTPUT_FILE" --output-dir "$OUTPUT_DIR"

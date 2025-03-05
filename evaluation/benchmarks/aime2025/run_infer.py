@@ -61,7 +61,7 @@ def get_config(
     config = AppConfig(
         default_agent=metadata.agent_class,
         run_as_openhands=False,
-        runtime=os.environ.get('RUNTIME', 'local'),  # Use local runtime instead of docker
+        runtime=os.environ.get('RUNTIME', 'docker'),  # Use docker runtime by default
         max_iterations=metadata.max_iterations,
         sandbox=sandbox_config,
         # do not mount workspace
@@ -361,8 +361,19 @@ def process_instance(
     # create sandbox and run the agent
     # =============================================
 
-    runtime: Runtime = create_runtime(config)
-    call_async_from_sync(runtime.connect)
+    try:
+        runtime: Runtime = create_runtime(config)
+        call_async_from_sync(runtime.connect)
+    except Exception as e:
+        if "docker" in str(e).lower() and config.runtime == "docker":
+            logger.warning(f"Docker runtime failed: {e}. Falling back to local runtime.")
+            # Fall back to local runtime
+            config.runtime = "local"
+            runtime: Runtime = create_runtime(config)
+            call_async_from_sync(runtime.connect)
+        else:
+            # Re-raise if it's not a Docker-related error
+            raise
 
     # Get the override_tools from metadata details if it exists
     override_tools = (
@@ -638,6 +649,16 @@ if __name__ == '__main__':
     logger.info(f"Dataset columns: {aime_df.columns.tolist()}")
     logger.info(f"Dataset instance_id dtype: {aime_df['instance_id'].dtype}")
     logger.info(f"First 5 instance_ids: {aime_df['instance_id'].head(5).tolist()}")
+    
+    # Verify that the dataset has the required columns
+    required_columns = ['question', 'answer']
+    missing_columns = [col for col in required_columns if col not in aime_df.columns]
+    if missing_columns:
+        raise ValueError(f"Dataset is missing required columns: {missing_columns}")
+    
+    # Verify that the dataset has at least one row
+    if len(aime_df) == 0:
+        raise ValueError("Dataset is empty")
 
     llm_config = None
     if args.llm_config:
