@@ -49,175 +49,341 @@ STOP_WORDS = ['</function']
 
 # NOTE: we need to make sure this example is always in-sync with the tool interface designed in openhands/agenthub/codeact_agent/function_calling.py
 IN_CONTEXT_LEARNING_EXAMPLE_PREFIX = """
-Here's a running example of how to perform a task with the provided tools.
+Here's a running example of how to break down a complex problem into sub-problems and solve each one using tools.
 
 --------------------- START OF EXAMPLE ---------------------
 
-USER: Problem: Convert the point $(0,3)$ in rectangular coordinates to polar coordinates. Enter your answer in the form $(r,\\theta),$ where $r > 0$ and $0 \\le \\theta < 2 \\pi.$
+USER: Problem: Find the number of ordered pairs of integers $(a, b)$ such that the sequence $[3, 4, 5, a, b, 30, 40, 50]$ is strictly increasing and no set of four (not necessarily consecutive) terms forms an arithmetic progression.
 
-ASSISTANT: I need to convert the rectangular coordinates $(0,3)$ to polar coordinates $(r,\\theta)$.
+ASSISTANT: I'll solve this problem by breaking it down into sub-problems and using Python to verify each step.
 
-For the conversion, I'll use these formulas:
-- $r = \\sqrt{x^2 + y^2}$
-- $\\theta = \\arctan(\\frac{y}{x})$
-
-Given the point $(0,3)$:
-- $x = 0$
-- $y = 3$
-
-First, I'll calculate $r$:
-$r = \\sqrt{0^2 + 3^2} = \\sqrt{9} = 3$
-
-Now for $\\theta$, I need to calculate $\\arctan(\\frac{y}{x}) = \\arctan(\\frac{3}{0})$
-
-Wait, this is a problem because division by zero is undefined. Since $x = 0$ and $y > 0$, the point lies on the positive y-axis, which corresponds to an angle of $\\theta = \\frac{\\pi}{2}$ or 90 degrees.
-
-Let me verify my reasoning with Python:
+First, I need to install the necessary libraries:
 
 <function=execute_ipython_cell>
 <parameter=code>
+# Install necessary libraries
+import itertools
 import numpy as np
-import math
-
-# Given point
-x, y = 0, 3
-
-# Calculate r
-r = np.sqrt(x**2 + y**2)
-print(f"r = √({x}² + {y}²) = {r}")
-
-# Try to calculate θ using the standard arctan formula
-print("Attempting standard arctan formula:")
-try:
-    theta_standard = np.arctan(y/x)
-    print(f"θ = arctan({y}/{x}) = {theta_standard} radians")
-except ZeroDivisionError:
-    print(f"Error: Division by zero when calculating arctan({y}/{x})")
 </parameter>
 </function>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
-r = √(0² + 3²) = 3.0
-Attempting standard arctan formula:
-Error: Division by zero when calculating arctan(3/0)
+[Jupyter current working directory: /workspace]
+[Jupyter Python interpreter: /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/bin/python]
 
-ASSISTANT: I see that my calculation for $r = 3$ is correct, but as I suspected, the standard arctangent formula leads to a division by zero error when $x = 0$.
+ASSISTANT: Now I'll break this problem into sub-problems:
 
-For points on the y-axis, I need to use a different approach. Let me try using the `arctan2` function, which is specifically designed to handle all quadrants and special cases:
+Sub-problem 1: Understand the constraints on a and b for the sequence to be strictly increasing.
+Sub-problem 2: Define a function to check if four numbers form an arithmetic progression.
+Sub-problem 3: Identify specific invalid pairs (a,b) that create arithmetic progressions.
+Sub-problem 4: Count all valid pairs by checking each possible (a,b) combination.
+
+Let me start with sub-problem 1:
 
 <function=execute_ipython_cell>
 <parameter=code>
-import numpy as np
+# Sub-problem 1: Understand the constraints on a and b
 
-# Given point
-x, y = 0, 3
+# For the sequence [3, 4, 5, a, b, 30, 40, 50] to be strictly increasing:
+# 5 < a < b < 30
 
-# Calculate θ using arctan2 which handles special cases
-theta = np.arctan2(y, x)
-print(f"θ = arctan2({y}, {x}) = {theta} radians")
-print(f"θ = {np.degrees(theta)} degrees")
+# Calculate possible values for a and b
+a_min = 6  # a must be greater than 5
+a_max = 28  # a must be less than b, which must be less than 30
+b_min_formula = "a + 1"  # b must be greater than a
+b_max = 29  # b must be less than 30
 
-# Check if θ is in the range [0, 2π)
-if theta < 0:
-    theta += 2 * np.pi
-    print(f"Adjusted θ to be in [0, 2π) range: {theta} radians")
-else:
-    print(f"θ is already in [0, 2π) range: {theta} radians")
+# Calculate total possible pairs before checking AP constraint
+total_pairs = sum(29 - a for a in range(6, 29))
+
+print(f"Constraints: 5 < a < b < 30")
+print(f"Possible values for a: {a_min} to {a_max}")
+print(f"For each a, possible values for b: {b_min_formula} to {b_max}")
+print(f"Total possible pairs before checking AP constraint: {total_pairs}")
 </parameter>
 </function>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
-θ = arctan2(3, 0) = 1.5707963267948966 radians
-θ = 90.0 degrees
-θ is already in [0, 2π) range: 1.5707963267948966 radians
+Constraints: 5 < a < b < 30
+Possible values for a: 6 to 28
+For each a, possible values for b: a + 1 to 29
+Total possible pairs before checking AP constraint: 276
+[Jupyter current working directory: /workspace]
+[Jupyter Python interpreter: /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/bin/python]
 
-ASSISTANT: Great! The `arctan2` function confirms that for the point $(0,3)$:
-- $\\theta = 1.5707963267948966$ radians
-- $\\theta = 90$ degrees
-- This angle is already in the required range $[0, 2\\pi)$
-
-This matches my reasoning that when a point is on the positive y-axis, the angle is $\\frac{\\pi}{2}$ or 90 degrees.
-
-Let me double-check that this is the correct representation in polar coordinates by converting back to rectangular coordinates:
+ASSISTANT: Now I'll tackle sub-problem 2 - defining a function to check if four numbers form an arithmetic progression:
 
 <function=execute_ipython_cell>
 <parameter=code>
-import numpy as np
+# Sub-problem 2: Define a function to check if four numbers form an arithmetic progression
 
-# Polar coordinates
-r = 3.0
-theta = 1.5707963267948966  # π/2 radians (90 degrees)
+def is_arithmetic_progression(numbers):
+    if len(numbers) < 2:
+        return False
 
-# Convert back to rectangular coordinates
-x_back = r * np.cos(theta)
-y_back = r * np.sin(theta)
+    # Sort the numbers (since we're checking any four terms, not necessarily in order)
+    sorted_nums = sorted(numbers)
 
-print(f"Converting from polar (r={r}, θ={theta} radians) back to rectangular:")
-print(f"x = r·cos(θ) = {r} · cos({theta}) = {x_back}")
-print(f"y = r·sin(θ) = {r} · sin({theta}) = {y_back}")
+    # Calculate the common difference
+    d = sorted_nums[1] - sorted_nums[0]
 
-# Check if we get back to our original point (0,3)
-print(f"\nOriginal point: (0, 3)")
-print(f"Converted back point: ({x_back:.10f}, {y_back:.10f})")
+    # Check if all consecutive pairs have the same difference
+    for i in range(1, len(sorted_nums) - 1):
+        if sorted_nums[i + 1] - sorted_nums[i] != d:
+            return False
 
-# Check for numerical precision issues
-if abs(x_back) < 1e-10:
-    print("x is effectively zero (within numerical precision)")
+    return True
+
+# Test the function with some examples
+test_cases = [
+    ([3, 4, 5, 6], True),      # AP with difference 1
+    ([3, 5, 7, 9], True),      # AP with difference 2
+    ([10, 20, 30, 40], True),  # AP with difference 10
+    ([3, 4, 6, 9], False),     # Not an AP
+    ([3, 5, 8, 10], False)     # Not an AP
+]
+
+for nums, expected in test_cases:
+    result = is_arithmetic_progression(nums)
+    print(f"{nums}: {'is AP' if result else 'not AP'} (Expected: {'AP' if expected else 'not AP'})")
 </parameter>
 </function>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
-Converting from polar (r=3.0, θ=1.5707963267948966 radians) back to rectangular:
-x = r·cos(θ) = 3.0 · cos(1.5707963267948966) = 1.8369701987210297e-16
-y = r·sin(θ) = 3.0 · sin(1.5707963267948966) = 3.0
+[3, 4, 5, 6]: is AP (Expected: AP)
+[3, 5, 7, 9]: is AP (Expected: AP)
+[10, 20, 30, 40]: is AP (Expected: AP)
+[3, 4, 6, 9]: not AP (Expected: not AP)
+[3, 5, 8, 10]: not AP (Expected: not AP)
+[Jupyter current working directory: /workspace]
+[Jupyter Python interpreter: /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/bin/python]
 
-Original point: (0, 3)
-Converted back point: (0.0000000000, 3.0000000000)
-x is effectively zero (within numerical precision)
-
-ASSISTANT: Perfect! The conversion back to rectangular coordinates confirms our polar representation is correct:
-- When converting $(r=3, \\theta=\\frac{\\pi}{2})$ back to rectangular coordinates, we get $(0, 3)$
-- The x-value is not exactly zero but $1.8369701987210297 \\times 10^{-16}$, which is effectively zero due to floating-point precision limitations
-
-Let me verify one more thing - I want to make sure I understand the range requirement correctly. The problem asks for $0 \\le \\theta < 2\\pi$:
+ASSISTANT: Now for sub-problem 3, I'll identify some specific invalid pairs (a,b) that create arithmetic progressions:
 
 <function=execute_ipython_cell>
 <parameter=code>
-import numpy as np
+# Sub-problem 3: Identify specific invalid pairs (a,b) that create arithmetic progressions
 
-# Check if our theta is in the required range
-theta = 1.5707963267948966  # π/2 radians
-pi = np.pi
+def check_invalid_pair(a, b):
+    sequence = [3, 4, 5, a, b, 30, 40, 50]
 
-print(f"θ = {theta} radians")
-print(f"π/2 = {pi/2} radians")
-print(f"2π = {2*pi} radians")
+    # Check all possible 4-element combinations
+    for comb in itertools.combinations(sequence, 4):
+        if is_arithmetic_progression(comb):
+            return True, comb
 
-# Check range requirement
-in_range = 0 <= theta < 2*pi
-print(f"Is θ in the range [0, 2π)? {in_range}")
+    return False, None
 
-# Express in terms of π for mathematical notation
-print(f"θ = {theta/pi}π radians")
+# Test some specific pairs
+test_pairs = [
+    (6, 7),    # Should be invalid: [3,4,5,6] forms an AP
+    (10, 20),  # Should be invalid: [10,20,30,40] forms an AP
+    (12, 21),  # Should be invalid: [3,12,21,30] forms an AP
+    (7, 9),    # Should be invalid: [3,5,7,9] forms an AP
+    (8, 9)     # Should be valid (no obvious AP)
+]
+
+for a, b in test_pairs:
+    invalid, ap_found = check_invalid_pair(a, b)
+    status = "Invalid" if invalid else "Valid"
+    ap_info = f" - AP found: {ap_found}" if invalid else ""
+    print(f"Pair (a={a}, b={b}): {status}{ap_info}")
 </parameter>
 </function>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
-θ = 1.5707963267948966 radians
-π/2 = 1.5707963267948966 radians
-2π = 6.283185307179586 radians
-Is θ in the range [0, 2π)? True
-θ = 0.5π radians
+Pair (a=6, b=7): Invalid - AP found: (3, 4, 5, 6)
+Pair (a=10, b=20): Invalid - AP found: (10, 20, 30, 40)
+Pair (a=12, b=21): Invalid - AP found: (3, 12, 21, 30)
+Pair (a=7, b=9): Invalid - AP found: (3, 5, 7, 9)
+Pair (a=8, b=9): Valid
+[Jupyter current working directory: /workspace]
+[Jupyter Python interpreter: /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/bin/python]
 
-ASSISTANT: This confirms that our answer is correct and meets all the requirements:
-1. We have $r = 3$, which is positive as required
-2. We have $\\theta = \\frac{\\pi}{2} = 1.5707963267948966$ radians, which is in the range $[0, 2\\pi)$
-3. When converted back to rectangular coordinates, these polar coordinates correctly represent the original point $(0,3)$
+ASSISTANT: Now I'll solve sub-problem 4 by counting all valid pairs. Since there are 276 possible pairs to check, I'll implement an efficient algorithm:
 
-Therefore, the polar coordinates of the point $(0,3)$ are $(3, \\frac{\\pi}{2})$.
+<function=execute_ipython_cell>
+<parameter=code>
+# Sub-problem 4: Count all valid pairs by checking each possible (a,b) combination
+
+def count_valid_pairs():
+    valid_count = 0
+    invalid_count = 0
+
+    # Iterate over all possible a values (6 <= a <= 28)
+    for a in range(6, 29):
+        # For each a, iterate over possible b values (a+1 <= b <= 29)
+        for b in range(a + 1, 30):
+            sequence = [3, 4, 5, a, b, 30, 40, 50]
+            has_ap = False
+
+            # Check all 4-element combinations
+            for comb in itertools.combinations(sequence, 4):
+                if is_arithmetic_progression(comb):
+                    has_ap = True
+                    invalid_count += 1
+                    break  # No need to check further if an AP is found
+
+            if not has_ap:
+                valid_count += 1
+
+    return valid_count, invalid_count
+
+# Run the counting function
+valid_pairs, invalid_pairs = count_valid_pairs()
+total_pairs = valid_pairs + invalid_pairs
+
+print(f"Total possible pairs: {total_pairs}")
+print(f"Invalid pairs (contain an AP): {invalid_pairs}")
+print(f"Valid pairs (no AP): {valid_pairs}")
+
+# Verify our total matches our earlier calculation
+print(f"Verification: Total matches earlier calculation: {total_pairs == 276}")
+</parameter>
+</function>
+
+USER: EXECUTION RESULT of [execute_ipython_cell]:
+Total possible pairs: 276
+Invalid pairs (contain an AP): 48
+Valid pairs (no AP): 228
+Verification: Total matches earlier calculation: True
+[Jupyter current working directory: /workspace]
+[Jupyter Python interpreter: /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/bin/python]
+
+ASSISTANT: Let me verify the result by checking a few more specific cases to make sure our algorithm is correct:
+
+<function=execute_ipython_cell>
+<parameter=code>
+# Verify our result with additional test cases
+
+# Let's check a few more pairs that should be valid
+additional_test_pairs = [
+    (8, 10),   # Should be valid
+    (15, 25),  # Should be valid
+    (9, 15)    # Should be valid
+]
+
+for a, b in additional_test_pairs:
+    invalid, ap_found = check_invalid_pair(a, b)
+    status = "Invalid" if invalid else "Valid"
+    ap_info = f" - AP found: {ap_found}" if invalid else ""
+    print(f"Pair (a={a}, b={b}): {status}{ap_info}")
+
+# Let's also check the distribution of valid pairs for different values of a
+valid_by_a = {}
+for a in range(6, 29):
+    valid_by_a[a] = 0
+    for b in range(a + 1, 30):
+        sequence = [3, 4, 5, a, b, 30, 40, 50]
+        has_ap = False
+        for comb in itertools.combinations(sequence, 4):
+            if is_arithmetic_progression(comb):
+                has_ap = True
+                break
+        if not has_ap:
+            valid_by_a[a] += 1
+
+print("\nDistribution of valid pairs by value of a:")
+for a, count in valid_by_a.items():
+    print(f"a = {a}: {count} valid pairs")
+
+# Verify the total again
+print(f"\nSum of valid pairs across all a values: {sum(valid_by_a.values())}")
+</parameter>
+</function>
+
+USER: EXECUTION RESULT of [execute_ipython_cell]:
+Pair (a=8, b=10): Valid
+Pair (a=15, b=25): Valid
+Pair (a=9, b=15): Valid
+
+Distribution of valid pairs by value of a:
+a = 6: 0 valid pairs
+a = 7: 21 valid pairs
+a = 8: 20 valid pairs
+a = 9: 19 valid pairs
+a = 10: 18 valid pairs
+a = 11: 17 valid pairs
+a = 12: 16 valid pairs
+a = 13: 15 valid pairs
+a = 14: 14 valid pairs
+a = 15: 13 valid pairs
+a = 16: 12 valid pairs
+a = 17: 11 valid pairs
+a = 18: 10 valid pairs
+a = 19: 9 valid pairs
+a = 20: 8 valid pairs
+a = 21: 7 valid pairs
+a = 22: 6 valid pairs
+a = 23: 5 valid pairs
+a = 24: 4 valid pairs
+a = 25: 3 valid pairs
+a = 26: 2 valid pairs
+a = 27: 1 valid pairs
+a = 28: 0 valid pairs
+
+Sum of valid pairs across all a values: 228
+[Jupyter current working directory: /workspace]
+[Jupyter Python interpreter: /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/bin/python]
+
+ASSISTANT: Now I'll combine the results from all sub-problems to determine the final answer:
+
+<function=execute_ipython_cell>
+<parameter=code>
+# Combining results from all sub-problems
+
+print("Summary of findings:")
+print("1. The sequence [3, 4, 5, a, b, 30, 40, 50] must be strictly increasing, so 5 < a < b < 30")
+print("2. This gives us 276 possible pairs (a,b) before considering the AP constraint")
+print("3. We need to exclude pairs where any four terms form an arithmetic progression")
+print("4. Our algorithm identified 48 invalid pairs that create arithmetic progressions")
+print("5. This leaves 228 valid pairs that satisfy all constraints")
+
+# Some interesting observations:
+print("\nInteresting observations:")
+print("- When a=6, all pairs are invalid because [3,4,5,6] always forms an AP")
+print("- When a=28, all pairs are invalid because there's only one possible b (b=29)")
+print("- The number of valid pairs decreases linearly as a increases")
+print("- For a=7, we have the maximum number of valid pairs (21)")
+
+print("\nTherefore, the answer is 228.")
+</parameter>
+</function>
+
+USER: EXECUTION RESULT of [execute_ipython_cell]:
+Summary of findings:
+1. The sequence [3, 4, 5, a, b, 30, 40, 50] must be strictly increasing, so 5 < a < b < 30
+2. This gives us 276 possible pairs (a,b) before considering the AP constraint
+3. We need to exclude pairs where any four terms form an arithmetic progression
+4. Our algorithm identified 48 invalid pairs that create arithmetic progressions
+5. This leaves 228 valid pairs that satisfy all constraints
+
+Interesting observations:
+- When a=6, all pairs are invalid because [3,4,5,6] always forms an AP
+- When a=28, all pairs are invalid because there's only one possible b (b=29)
+- The number of valid pairs decreases linearly as a increases
+- For a=7, we have the maximum number of valid pairs (21)
+
+Therefore, the answer is 228.
+[Jupyter current working directory: /workspace]
+[Jupyter Python interpreter: /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/bin/python]
+
+ASSISTANT: I've solved this problem by breaking it down into sub-problems and using Python to verify each step:
+
+1. First, I identified the constraints: For the sequence [3,4,5,a,b,30,40,50] to be strictly increasing, we need 5 < a < b < 30.
+
+2. I created a function to check if four numbers form an arithmetic progression, which is when the differences between consecutive terms are equal.
+
+3. I identified specific invalid pairs like (6,7), (10,20), (12,21), and (7,9) that create arithmetic progressions.
+
+4. I systematically checked all 276 possible pairs and found that 48 of them create arithmetic progressions, leaving 228 valid pairs.
+
+5. I verified my answer by checking additional test cases and analyzing the distribution of valid pairs across different values of a.
+
+The answer is 228.
 
 <function=finish>
-<parameter=solution>\\boxed{(3, \\frac{\\pi}{2})}</parameter>
+<parameter=solution>228</parameter>
 </function>
 
 --------------------- END OF EXAMPLE ---------------------
@@ -363,7 +529,8 @@ def convert_fncall_messages_to_non_fncall_messages(
                                 and tool['function']['name'] == 'execute_bash'
                                 and 'parameters' in tool['function']
                                 and 'properties' in tool['function']['parameters']
-                                and 'command' in tool['function']['parameters']['properties']
+                                and 'command'
+                                in tool['function']['parameters']['properties']
                             )
                             for tool in tools
                         )
@@ -375,7 +542,8 @@ def convert_fncall_messages_to_non_fncall_messages(
                                 and tool['function']['name'] == 'execute_ipython_cell'
                                 and 'parameters' in tool['function']
                                 and 'properties' in tool['function']['parameters']
-                                and 'code' in tool['function']['parameters']['properties']
+                                and 'code'
+                                in tool['function']['parameters']['properties']
                             )
                             for tool in tools
                         )
@@ -544,10 +712,12 @@ def _extract_and_validate_params(
                 pass
 
         # Enum check
-        if ('parameters' in matching_tool and 
-            'properties' in matching_tool['parameters'] and 
-            param_name in matching_tool['parameters']['properties'] and
-            'enum' in matching_tool['parameters']['properties'][param_name]):
+        if (
+            'parameters' in matching_tool
+            and 'properties' in matching_tool['parameters']
+            and param_name in matching_tool['parameters']['properties']
+            and 'enum' in matching_tool['parameters']['properties'][param_name]
+        ):
             if (
                 param_value
                 not in matching_tool['parameters']['properties'][param_name]['enum']
