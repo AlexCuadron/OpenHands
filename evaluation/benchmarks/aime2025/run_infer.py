@@ -68,13 +68,18 @@ def get_config(
     if agent_cls in INST_SUFFIXES:
         instructions = f"{instructions}\n\n{INST_SUFFIXES[agent_cls]}"
 
+    # Get the allowed tools from the metadata details
+    allowed_tools = (
+        metadata.details.get('allowed_tools', 'all') if hasattr(metadata, 'details') else 'all'
+    )
+    
     # Create the config
     config = AppConfig(
         llm=llm_config,
         agent=agent_cls,
         sandbox=sandbox_config,
         instructions=instructions,
-        allowed_tools=metadata.allowed_tools,
+        allowed_tools=allowed_tools,
     )
 
     return config
@@ -333,6 +338,14 @@ def main():
         help='Threshold for determining overthinking (default: None)',
     )
     
+    # Add allowed-tools argument
+    parser.add_argument(
+        '--allowed-tools',
+        type=str,
+        default='all',
+        help='Tools allowed for the agent (default: all)',
+    )
+    
     # Parse the arguments
     args = parser.parse_args()
     
@@ -341,6 +354,11 @@ def main():
     
     # Add the overthinking threshold to the metadata
     metadata.overthinking_threshold = args.overthinking_threshold
+    
+    # Add the allowed tools to the metadata details
+    if not hasattr(metadata, 'details'):
+        metadata.details = {}
+    metadata.details['allowed_tools'] = args.allowed_tools
     
     # Load the dataset
     df = load_aime2025_dataset()
