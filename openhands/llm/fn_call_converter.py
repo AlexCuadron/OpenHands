@@ -400,7 +400,12 @@ PLEASE follow the format strictly! PLEASE EMIT ONE AND ONLY ONE FUNCTION CALL PE
 """
 
 # Regex patterns for function call parsing
-FN_REGEX_PATTERN = r'<function=([^>]+)>[\n]?(.*?)</function>'
+# Main pattern with optional closing tag
+FN_REGEX_PATTERN = r'<function=([^>]+)>[\n]?(.*?)(?:</function>|$)'
+
+# Fallback patterns for incomplete function calls
+FN_REGEX_PATTERN_NO_CLOSE = r'<function=([^>]+)>[\n]?(.*?)$'
+FN_REGEX_PATTERN_FINISH = r'<function=finish>[\n]?(?:<parameter=([^>]+)>(.*?)</parameter>)?'
 FN_PARAM_REGEX_PATTERN = r'<parameter=([^>]+)>(.*?)</parameter>'
 
 # Add new regex pattern for tool execution results
@@ -864,29 +869,59 @@ def convert_non_fncall_messages_to_fncall_messages(
             if isinstance(content, str):
                 content = _fix_stopword(content)
                 # First check for IPython cell execution specifically
-                ipython_pattern = r'<function=execute_ipython_cell>.*?<parameter=code>(.*?)</parameter>.*?</function>'
-                ipython_match = re.search(ipython_pattern, content, re.DOTALL)
+                ipython_patterns = [
+                    r'<function=execute_ipython_cell>.*?<parameter=code>(.*?)</parameter>.*?</function>',
+                    r'<function=execute_ipython_cell>.*?<parameter=code>(.*?)</parameter>',  # Missing closing tag
+                    r'<function=execute_ipython_cell[\s\n]*><parameter=code>(.*?)</parameter>'  # No space between tags
+                ]
+                
+                ipython_match = None
+                for pattern in ipython_patterns:
+                    ipython_match = re.search(pattern, content, re.DOTALL)
+                    if ipython_match:
+                        break
+                        
                 if ipython_match:
                     # This is an IPython cell execution, handle it specially
                     fn_match = re.search(r'<function=(execute_ipython_cell)>', content, re.DOTALL)
                 else:
-                    # Regular function call pattern
-                    fn_match = re.search(FN_REGEX_PATTERN, content, re.DOTALL)
+                    # Check for finish function with missing closing tag
+                    finish_match = re.search(FN_REGEX_PATTERN_FINISH, content, re.DOTALL)
+                    if finish_match:
+                        fn_match = re.search(r'<function=(finish)>', content, re.DOTALL)
+                    else:
+                        # Regular function call pattern (with optional closing tag)
+                        fn_match = re.search(FN_REGEX_PATTERN, content, re.DOTALL)
             elif isinstance(content, list):
                 if content and content[-1]['type'] == 'text':
                     content[-1]['text'] = _fix_stopword(content[-1]['text'])
                     
                     # First check for IPython cell execution specifically
-                    ipython_pattern = r'<function=execute_ipython_cell>.*?<parameter=code>(.*?)</parameter>.*?</function>'
-                    ipython_match = re.search(ipython_pattern, content[-1]['text'], re.DOTALL)
+                    ipython_patterns = [
+                        r'<function=execute_ipython_cell>.*?<parameter=code>(.*?)</parameter>.*?</function>',
+                        r'<function=execute_ipython_cell>.*?<parameter=code>(.*?)</parameter>',  # Missing closing tag
+                        r'<function=execute_ipython_cell[\s\n]*><parameter=code>(.*?)</parameter>'  # No space between tags
+                    ]
+                    
+                    ipython_match = None
+                    for pattern in ipython_patterns:
+                        ipython_match = re.search(pattern, content[-1]['text'], re.DOTALL)
+                        if ipython_match:
+                            break
+                            
                     if ipython_match:
                         # This is an IPython cell execution, handle it specially
                         fn_match = re.search(r'<function=(execute_ipython_cell)>', content[-1]['text'], re.DOTALL)
                     else:
-                        # Regular function call pattern
-                        fn_match = re.search(
-                            FN_REGEX_PATTERN, content[-1]['text'], re.DOTALL
-                        )
+                        # Check for finish function with missing closing tag
+                        finish_match = re.search(FN_REGEX_PATTERN_FINISH, content[-1]['text'], re.DOTALL)
+                        if finish_match:
+                            fn_match = re.search(r'<function=(finish)>', content[-1]['text'], re.DOTALL)
+                        else:
+                            # Regular function call pattern (with optional closing tag)
+                            fn_match = re.search(
+                                FN_REGEX_PATTERN, content[-1]['text'], re.DOTALL
+                            )
                 else:
                     fn_match = None
                     ipython_match = None

@@ -92,9 +92,18 @@ def response_to_actions(response: ModelResponse, agent=None) -> list[Action]:
             ipython_patterns = [
                 r'<function=execute_ipython_cell>.*?<parameter=code>(.*?)</parameter>.*?</function>',
                 r'<function=execute_ipython_cell>.*?<parameter=code>(.*?)</parameter>',  # Handle missing closing tag
-                r'<function=execute_ipython_cell[\s\n]*><parameter=code>(.*?)</parameter>'  # Handle no space between tags
+                r'<function=execute_ipython_cell[\s\n]*><parameter=code>(.*?)</parameter>',  # Handle no space between tags
+                r'<function=execute_ipython_cell>[\s\n]?<parameter=code>(.*)'  # Handle completely malformed pattern
             ]
             
+            # Also check for finish function with missing closing tag
+            finish_patterns = [
+                r'<function=finish>.*?<parameter=solution>(.*?)</parameter>.*?</function>',
+                r'<function=finish>.*?<parameter=solution>(.*?)</parameter>',  # Missing closing tag
+                r'<function=finish>[\s\n]*<parameter=solution>(.*?)</parameter>'  # No space between tags
+            ]
+            
+            # First check for IPython cell execution
             for pattern in ipython_patterns:
                 ipython_match = re.search(pattern, content, re.DOTALL)
                 if ipython_match:
@@ -102,6 +111,38 @@ def response_to_actions(response: ModelResponse, agent=None) -> list[Action]:
                     code = ipython_match.group(1)
                     logger.info(f'Directly extracted IPython code from content using pattern: {pattern}')
                     actions.append(IPythonRunCellAction(code=code))
+                    return actions
+            
+            # Then check for finish function with missing closing tag
+            for pattern in finish_patterns:
+                finish_match = re.search(pattern, content, re.DOTALL)
+                if finish_match:
+                    # We found a direct match for finish with solution
+                    solution = finish_match.group(1)
+                    logger.info(f'Directly extracted finish solution from content with missing closing tag: {solution}')
+                    
+                    # Create finish action with the solution
+                    arguments = {
+                        'message': 'Task completed.',
+                        'task_completed': 'true',
+                        'solution': solution
+                    }
+                    
+                    # Check if Python has been used (if agent is provided)
+                    if agent and hasattr(agent, 'python_used') and not agent.python_used:
+                        # Python hasn't been used, create a message action instead
+                        error_message = 'I need to use Python to solve this problem. Let me try using Python first.'
+                        logger.warning("Blocked finish action because Python hasn't been used yet")
+                        actions.append(MessageAction(content=error_message, wait_for_response=False))
+                    else:
+                        # Create the finish action
+                        actions.append(AgentFinishAction(
+                            message=arguments['message'],
+                            task_completed=(arguments['task_completed'] == 'true'),
+                            solution=arguments.get('solution', None),
+                            outputs=arguments
+                        ))
+                    
                     return actions
             
             # Fallback: Check if there's a code parameter anywhere in the content
