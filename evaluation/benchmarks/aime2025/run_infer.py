@@ -341,72 +341,13 @@ def evaluate_answer(
     return results
 
 
-async def _run_instance_async(
-    instance: pd.Series,
-    metadata: EvalMetadata,
-    runtime: Optional[Runtime] = None,
-) -> Dict[str, Any]:
-    """
-    Run a single instance of the AIME2025 benchmark asynchronously.
-
-    Args:
-        instance: The instance to run
-        metadata: Evaluation metadata
-        runtime: Optional runtime to use
-
-    Returns:
-        Dict[str, Any]: Results of the run
-    """
-    # Reset the logger for multiprocessing
-    reset_logger_for_multiprocessing()
-
-    # Get the config for this instance
-    config = get_config(instance, metadata)
-
-    # Create a runtime if one is not provided
-    if runtime is None:
-        runtime = await create_runtime(config)
-
-    # Create a state for the controller
-    state = State()
-
-    # Add the fake response function if available
-    if metadata.agent_cls in FAKE_RESPONSES:
-        state.fake_response_fn = FAKE_RESPONSES[metadata.agent_cls]
-
-    # Run the controller
-    await run_controller(runtime, state, config)
-
-    # Extract the answer from the history
-    predicted_answer = extract_answer(state.history, instance['answer'])
-
-    # Evaluate the answer
-    eval_results = evaluate_answer(
-        predicted_answer, instance['answer'], state.history, metadata
-    )
-
-    # Create the output
-    output = {
-        'instance_id': instance['id'],
-        'problem': instance['problem'],
-        'predicted_answer': eval_results['predicted_answer'],
-        'ground_truth': eval_results['ground_truth'],
-        'is_correct': eval_results['is_correct'],
-        'should_discard': eval_results['should_discard'],
-        'discard_reason': eval_results['discard_reason'],
-        'history': compatibility_for_eval_history_pairs(state.history),
-    }
-
-    return output
-
-
-async def run_instance(
+def process_instance(
     instance: pd.Series,
     metadata: EvalMetadata,
     reset_logger: bool = True,
 ) -> EvalOutput:
     """
-    Run a single instance of the AIME2025 benchmark.
+    Process a single instance of the AIME2025 benchmark.
 
     Args:
         instance: The instance to run
@@ -425,25 +366,46 @@ async def run_instance(
             f'\nStarting evaluation for instance {str(instance.instance_id)}.\n'
         )
     
-    # Run the instance asynchronously
-    result = await _run_instance_async(instance, metadata)
-    
-    # Convert the dictionary to an EvalOutput object
+    # Get the config for this instance
+    config = get_config(instance, metadata)
+
+    # Create a runtime
+    runtime = call_async_from_sync(create_runtime, config)
+
+    # Create a state for the controller
+    state = State()
+
+    # Add the fake response function if available
+    if metadata.agent_cls in FAKE_RESPONSES:
+        state.fake_response_fn = FAKE_RESPONSES[metadata.agent_cls]
+
+    # Run the controller
+    call_async_from_sync(run_controller, runtime, state, config)
+
+    # Extract the answer from the history
+    predicted_answer = extract_answer(state.history, instance['answer'])
+
+    # Evaluate the answer
+    eval_results = evaluate_answer(
+        predicted_answer, instance['answer'], state.history, metadata
+    )
+
+    # Create the output
     return EvalOutput(
         instance_id=str(instance.instance_id),
         instance=instance.to_dict(),
         instruction=instance['problem'],
         metadata=metadata,
-        history=result['history'],
+        history=compatibility_for_eval_history_pairs(state.history),
         metrics={
-            'is_correct': result['is_correct'],
-            'predicted_answer': result['predicted_answer'],
-            'ground_truth': result['ground_truth'],
+            'is_correct': eval_results['is_correct'],
+            'predicted_answer': eval_results['predicted_answer'],
+            'ground_truth': eval_results['ground_truth'],
         },
         error=None,
         test_result={
-            'should_discard': result['should_discard'],
-            'discard_reason': result['discard_reason'],
+            'should_discard': eval_results['should_discard'],
+            'discard_reason': eval_results['discard_reason'],
         },
     )
 
@@ -554,7 +516,7 @@ if __name__ == '__main__':
         metadata,
         output_file,
         args.eval_num_workers,
-        run_instance,
+        process_instance,
     )
 
 
