@@ -49,13 +49,14 @@ def get_config(
 ) -> AppConfig:
     sandbox_config = get_default_sandbox_config_for_eval()
 
-    # Get the LLM config
-    llm_config = get_llm_config_arg(metadata.llm_config)
-    if metadata.log_completions:
-        llm_config = update_llm_config_for_completions_logging(llm_config)
+    # Use the default Python image
+    sandbox_config.base_container_image = 'python:3.11-bookworm'
 
-    # Get the agent class
-    agent_cls = metadata.agent_cls
+    # Add extra dependencies to install math libraries
+    # This will be added to the Dockerfile
+    sandbox_config.runtime_extra_deps = (
+        'pip install --no-cache-dir sympy numpy scipy matplotlib pandas'
+    )
 
     # Get the instructions
     instructions = instance['problem']
@@ -65,18 +66,113 @@ def get_config(
         instructions = f"{instructions}\n\n{INSTRUCTIONS_ADDENDUM}"
 
     # Add the agent-specific instructions suffix
-    if agent_cls in INST_SUFFIXES:
-        instructions = f"{instructions}\n\n{INST_SUFFIXES[agent_cls]}"
+    if metadata.agent_cls in INST_SUFFIXES:
+        instructions = f"{instructions}\n\n{INST_SUFFIXES[metadata.agent_cls]}"
 
-    # Create the config
     config = AppConfig(
-        llm=llm_config,
-        agent=agent_cls,
+        default_agent=metadata.agent_cls,
+        run_as_openhands=False,
+        runtime=os.environ.get('RUNTIME', 'docker'),
+        max_iterations=metadata.max_iterations,
         sandbox=sandbox_config,
+        # do not mount workspace
+        workspace_base=None,
+        workspace_mount_path=None,
         instructions=instructions,
-        allowed_tools=metadata.allowed_tools,
     )
+    
+    # Update llm_config to enable completions logging
+    llm_config = update_llm_config_for_completions_logging(
+        metadata.llm_config, metadata.eval_output_dir, str(instance.instance_id)
+    )
+    
+    # Set temperature to 0.6 as recommended for mathematical problems
+    llm_config.temperature = 0.6
+    logger.info(f'Set temperature to 0.6 for AIME2025 benchmark')
 
+    # Disable native tool calling for Together.ai models
+    if llm_config and (
+        llm_config.model.startswith('deepseek')
+        or (llm_config.base_url and 'together.xyz' in llm_config.base_url)
+    ):
+        llm_config.native_tool_calling = False
+        logger.info(f'Disabled native tool calling for model: {llm_config.model}')
+
+    config.set_llm_config(llm_config)
+    agent_config = config.get_agent_config(metadata.agent_cls)
+    agent_config.enable_prompt_extensions = False
+
+    # For AIME2025 benchmark, configure the agent with the right tools based on the allowed_tools parameter
+    if metadata.agent_cls == 'CodeActAgent':
+        # Default configuration - disable browsing
+        agent_config.codeact_enable_browsing = False
+
+        # Get the allowed tools from the metadata details
+        allowed_tools = (
+            metadata.details.get('allowed_tools', 'all') if hasattr(metadata, 'details') else 'all'
+        )
+
+        if allowed_tools == 'ipython_only':
+            # Only enable IPython tool
+            agent_config.codeact_enable_jupyter = True
+            agent_config.codeact_enable_llm_editor = False
+            # We'll override the tools after agent initialization
+            if not hasattr(metadata, 'details'):
+                metadata.details = {}
+            metadata.details['override_tools'] = [
+                codeact_function_calling.IPythonTool,
+                codeact_function_calling.FinishTool,
+            ]
+            logger.info(
+                'Configured CodeActAgent for AIME2025 benchmark with IPython tool only'
+            )
+        elif allowed_tools == 'bash_only':
+            # Only enable Bash tool
+            agent_config.codeact_enable_jupyter = False
+            agent_config.codeact_enable_llm_editor = False
+            # We'll override the tools after agent initialization
+            if not hasattr(metadata, 'details'):
+                metadata.details = {}
+            metadata.details['override_tools'] = [
+                codeact_function_calling.CmdRunTool,
+                codeact_function_calling.FinishTool,
+            ]
+            logger.info(
+                'Configured CodeActAgent for AIME2025 benchmark with Bash tool only'
+            )
+        elif allowed_tools == 'no_editor':
+            # Enable Bash and IPython but no editor
+            agent_config.codeact_enable_jupyter = True
+            agent_config.codeact_enable_llm_editor = False
+            # We'll override the tools after agent initialization
+            if not hasattr(metadata, 'details'):
+                metadata.details = {}
+            metadata.details['override_tools'] = [
+                codeact_function_calling.CmdRunTool,
+                codeact_function_calling.IPythonTool,
+                codeact_function_calling.FinishTool,
+            ]
+            logger.info(
+                'Configured CodeActAgent for AIME2025 benchmark with Bash and IPython tools (no editor)'
+            )
+        else:  # 'all' or any other value
+            # Enable all tools except browsing
+            agent_config.codeact_enable_jupyter = True
+            agent_config.codeact_enable_llm_editor = False
+            # No need to override tools
+            if not hasattr(metadata, 'details'):
+                metadata.details = {}
+            metadata.details['override_tools'] = None
+            logger.info(
+                'Configured CodeActAgent for AIME2025 benchmark with all tools (except browsing)'
+            )
+
+    # copy 'draft_editor' config if exists
+    config_copy = copy.deepcopy(config)
+    load_from_toml(config_copy)
+    if 'draft_editor' in config_copy.llms:
+        config.set_llm_config(config_copy.llms['draft_editor'], 'draft_editor')
+        
     return config
 
 
@@ -320,12 +416,19 @@ def load_aime2025_dataset() -> pd.DataFrame:
     return df
 
 
-def main():
-    """Main function for running the AIME2025 benchmark."""
-    # Get the parser
+def parse_aime2025_arguments():
+    """Parse command-line arguments for the AIME2025 benchmark."""
     parser = get_parser()
+
+    # Add custom argument for allowed tools
+    parser.add_argument(
+        '--allowed-tools',
+        type=str,
+        default='all',
+        help='Comma-separated list of allowed tools for the agent. Options: all, ipython_only, bash_only, no_editor',
+    )
     
-    # Add benchmark-specific arguments
+    # Add custom argument for overthinking threshold
     parser.add_argument(
         '--overthinking-threshold',
         type=float,
@@ -333,17 +436,51 @@ def main():
         help='Threshold for determining overthinking (default: None)',
     )
     
-    # Parse the arguments
-    args = parser.parse_args()
-    
-    # Create the metadata
-    metadata = make_metadata(args)
-    
-    # Add the overthinking threshold to the metadata
-    metadata.overthinking_threshold = args.overthinking_threshold
-    
-    # Load the dataset
+    return parser.parse_args()
+
+
+if __name__ == '__main__':
+    args = parse_aime2025_arguments()
+
+    # Load the AIME2025 dataset
     df = load_aime2025_dataset()
+    
+    # Add instance_id if not present
+    if 'instance_id' not in df.columns:
+        df['instance_id'] = df['id'].apply(lambda x: f'aime2025_{x}')
+
+    llm_config = None
+    if args.llm_config:
+        llm_config = get_llm_config_arg(args.llm_config)
+        if llm_config is not None:
+            # modify_params must be False for evaluation purpose, for reproducibility and accuracy of results
+            llm_config.modify_params = False
+
+    if llm_config is None:
+        raise ValueError(f'Could not find LLM config: --llm_config {args.llm_config}')
+
+    # Create metadata for evaluation
+    metadata = make_metadata(args)
+    metadata.llm_config = llm_config
+    
+    # Add details to metadata if not present
+    if not hasattr(metadata, 'details'):
+        metadata.details = {}
+    
+    # Add the allowed tools to the metadata details
+    metadata.details['allowed_tools'] = args.allowed_tools
+    
+    # Add the overthinking threshold if provided
+    if args.overthinking_threshold is not None:
+        metadata.overthinking_threshold = args.overthinking_threshold
+        metadata.details['overthinking_threshold'] = args.overthinking_threshold
+        logger.info(f'\nUsing overthinking threshold: {args.overthinking_threshold}\n')
+    
+    # Parse dataset IDs if provided
+    eval_ids = None
+    if args.eval_ids:
+        eval_ids = str(args.eval_ids).split(',')
+        logger.info(f'\nUsing specific dataset IDs: {eval_ids}\n')
     
     # Prepare the dataset for evaluation
     df = prepare_dataset(df, args)
@@ -358,5 +495,3 @@ def main():
     )
 
 
-if __name__ == '__main__':
-    main()
