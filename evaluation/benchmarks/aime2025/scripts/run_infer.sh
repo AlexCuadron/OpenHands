@@ -87,8 +87,14 @@ if [ "$USE_PREFIX" = "true" ]; then
 import sys
 import os
 sys.path.insert(0, os.path.join('$(pwd)'))
-from openhands.conditional_prefix_llm import patch_llm_creation
-original_create_llm = patch_llm_creation()
+try:
+    from openhands.conditional_prefix_llm import patch_llm_creation
+    original_completion = patch_llm_creation()
+    print('Successfully set up conditional prefix LLM')
+except Exception as e:
+    print(f'Error setting up conditional prefix LLM: {e}')
+    # Continue without the prefix LLM
+    original_completion = None
 "
   echo "$PYTHON_SETUP" > /tmp/prefix_setup.py
   python3 /tmp/prefix_setup.py
@@ -142,9 +148,15 @@ if [ "$USE_PREFIX" = "true" ]; then
 import sys
 import os
 sys.path.insert(0, os.path.join('$(pwd)'))
-from openhands.conditional_prefix_llm import restore_llm_creation
-from openhands.core.main import create_llm
-restore_llm_creation(create_llm)
+try:
+    from openhands.conditional_prefix_llm import restore_llm_creation
+    # Use the original_completion variable from the setup
+    # This is a global variable in the script context
+    restore_llm_creation(original_completion)
+    print('Successfully cleaned up conditional prefix LLM')
+except Exception as e:
+    print(f'Error cleaning up conditional prefix LLM: {e}')
+    # Continue without cleanup
 "
   echo "$PYTHON_CLEANUP" > /tmp/prefix_cleanup.py
   python3 /tmp/prefix_cleanup.py
