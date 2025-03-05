@@ -400,11 +400,11 @@ async def _run_instance_async(
     return output
 
 
-def run_instance(
+async def run_instance(
     instance: pd.Series,
     metadata: EvalMetadata,
     reset_logger: bool = True,
-) -> Dict[str, Any]:
+) -> EvalOutput:
     """
     Run a single instance of the AIME2025 benchmark.
 
@@ -414,7 +414,7 @@ def run_instance(
         reset_logger: Whether to reset the logger
 
     Returns:
-        Dict[str, Any]: Results of the run
+        EvalOutput: Results of the run
     """
     # Setup the logger properly, so you can run multi-processing to parallelize the evaluation
     if reset_logger:
@@ -426,7 +426,26 @@ def run_instance(
         )
     
     # Run the instance asynchronously
-    return asyncio.run(_run_instance_async(instance, metadata))
+    result = await _run_instance_async(instance, metadata)
+    
+    # Convert the dictionary to an EvalOutput object
+    return EvalOutput(
+        instance_id=str(instance.instance_id),
+        instance=instance.to_dict(),
+        instruction=instance['problem'],
+        metadata=metadata,
+        history=result['history'],
+        metrics={
+            'is_correct': result['is_correct'],
+            'predicted_answer': result['predicted_answer'],
+            'ground_truth': result['ground_truth'],
+        },
+        error=None,
+        test_result={
+            'should_discard': result['should_discard'],
+            'discard_reason': result['discard_reason'],
+        },
+    )
 
 
 def load_aime2025_dataset() -> pd.DataFrame:
