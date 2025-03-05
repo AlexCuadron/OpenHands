@@ -47,8 +47,8 @@ Original messages:
 [
   {"role": "system", "content": "You are a helpful assistant."},
   {"role": "user", "content": "Who won the world cup in 2022?"},
-  {"role": "assistant", "content": "Let me check <function>get_world_cup_winner(2022)</function>"},
-  {"role": "function", "content": "Argentina"},
+  {"role": "assistant", "content": "Let me check <tool>get_world_cup_winner(2022)</tool>"},
+  {"role": "tool", "content": "Argentina"},
   {"role": "user", "content": "What was the score?"}
 ]
 ```
@@ -62,7 +62,7 @@ Transformed messages with prefix-based approach:
   },
   {
     "role": "assistant",
-    "content": "Let me check <function>get_world_cup_winner(2022)</function>\nObservation: Argentina",
+    "content": "Let me check <tool>get_world_cup_winner(2022)</tool>\nObservation: Argentina",
     "prefix": true
   },
   {

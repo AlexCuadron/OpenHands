@@ -65,11 +65,11 @@ def run_tests():
     test3_messages = [
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": "Who won the world cup in 2022?"},
-        {"role": "assistant", "content": "Let me check <function>get_world_cup_winner(2022)</function>"},
-        {"role": "function", "content": "Argentina"},
+        {"role": "assistant", "content": "Let me check <tool>get_world_cup_winner(2022)</tool>"},
+        {"role": "tool", "content": "Argentina"},
         {"role": "user", "content": "What was the score?"},
-        {"role": "assistant", "content": "Let me see by how much <function>get_world_cup_score(2022)</function>"},
-        {"role": "function", "content": "Argentina 3(4) - France 3(2) on penalties"},
+        {"role": "assistant", "content": "Let me see by how much <tool>get_world_cup_score(2022)</tool>"},
+        {"role": "tool", "content": "Argentina 3(4) - France 3(2) on penalties"},
         {"role": "user", "content": "Who scored for Argentina?"}
     ]
     test_transformation("World Cup Example", test3_messages)

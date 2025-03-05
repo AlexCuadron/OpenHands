@@ -123,7 +123,7 @@ def transform_to_prefix_format(messages: List[Dict[str, Any]]) -> List[Dict[str,
         if role == "assistant":
             # Add to the current turn
             current_turn.append({"role": "assistant", "content": content})
-        elif role == "tool" or role == "function":
+        elif role == "tool":
             # Add observation to the current turn
             current_turn.append({"role": "observation", "content": content})
         elif role == "user":

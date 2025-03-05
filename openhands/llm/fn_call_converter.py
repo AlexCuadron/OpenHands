@@ -20,32 +20,32 @@ from openhands.core.exceptions import (
 
 # Inspired by: https://docs.together.ai/docs/llama-3-function-calling#function-calling-w-llama-31-70b
 SYSTEM_PROMPT_SUFFIX_TEMPLATE = """
-You have access to the following functions:
+You have access to the following tools:
 
 {description}
 
-If you choose to call a function ONLY reply in the following format with NO suffix:
+If you choose to call a tool ONLY reply in the following format with NO suffix:
 
-<function=example_function_name>
+<tool=example_tool_name>
 <parameter=example_parameter_1>value_1</parameter>
 <parameter=example_parameter_2>
 This is the value for the second parameter
 that can span
 multiple lines
 </parameter>
-</function>
+</tool>
 
 <IMPORTANT>
 Reminder:
-- Function calls MUST follow the specified format, start with <function= and end with </function>
+- Tool calls MUST follow the specified format, start with <tool= and end with </tool>
 - Required parameters MUST be specified
-- Only call one function at a time
-- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after.
-- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls
+- Only call one tool at a time
+- You may provide optional reasoning for your tool call in natural language BEFORE the tool call, but NOT after.
+- If there is no tool call available, answer the question like normal with your current knowledge and do not tell the user about tool calls
 </IMPORTANT>
 """
 
-STOP_WORDS = ['</function']
+STOP_WORDS = ['</tool']
 
 # NOTE: we need to make sure this example is always in-sync with the tool interface designed in openhands/agenthub/codeact_agent/function_calling.py
 IN_CONTEXT_LEARNING_EXAMPLE_PREFIX = """
@@ -74,7 +74,7 @@ Wait, this is a problem because division by zero is undefined. Since $x = 0$ and
 
 Let me verify my reasoning with Python:
 
-<function=execute_ipython_cell>
+<tool=execute_ipython_cell>
 <parameter=code>
 import numpy as np
 import math
@@ -94,7 +94,7 @@ try:
 except ZeroDivisionError:
     print(f"Error: Division by zero when calculating arctan({y}/{x})")
 </parameter>
-</function>
+</tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 r = √(0² + 3²) = 3.0
@@ -105,7 +105,7 @@ ASSISTANT: I see that my calculation for $r = 3$ is correct, but as I suspected,
 
 For points on the y-axis, I need to use a different approach. Let me try using the `arctan2` function, which is specifically designed to handle all quadrants and special cases:
 
-<function=execute_ipython_cell>
+<tool=execute_ipython_cell>
 <parameter=code>
 import numpy as np
 
@@ -124,7 +124,7 @@ if theta < 0:
 else:
     print(f"θ is already in [0, 2π) range: {theta} radians")
 </parameter>
-</function>
+</tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 θ = arctan2(3, 0) = 1.5707963267948966 radians
@@ -140,7 +140,7 @@ This matches my reasoning that when a point is on the positive y-axis, the angle
 
 Let me double-check that this is the correct representation in polar coordinates by converting back to rectangular coordinates:
 
-<function=execute_ipython_cell>
+<tool=execute_ipython_cell>
 <parameter=code>
 import numpy as np
 
@@ -164,7 +164,7 @@ print(f"Converted back point: ({x_back:.10f}, {y_back:.10f})")
 if abs(x_back) < 1e-10:
     print("x is effectively zero (within numerical precision)")
 </parameter>
-</function>
+</tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 Converting from polar (r=3.0, θ=1.5707963267948966 radians) back to rectangular:
@@ -181,7 +181,7 @@ ASSISTANT: Perfect! The conversion back to rectangular coordinates confirms our 
 
 Let me verify one more thing - I want to make sure I understand the range requirement correctly. The problem asks for $0 \\le \\theta < 2\\pi$:
 
-<function=execute_ipython_cell>
+<tool=execute_ipython_cell>
 <parameter=code>
 import numpy as np
 
@@ -200,7 +200,7 @@ print(f"Is θ in the range [0, 2π)? {in_range}")
 # Express in terms of π for mathematical notation
 print(f"θ = {theta/pi}π radians")
 </parameter>
-</function>
+</tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 θ = 1.5707963267948966 radians
@@ -216,9 +216,9 @@ ASSISTANT: This confirms that our answer is correct and meets all the requiremen
 
 Therefore, the polar coordinates of the point $(0,3)$ are $(3, \\frac{\\pi}{2})$.
 
-<function=finish>
+<tool=finish>
 <parameter=solution>\\boxed{(3, \\frac{\\pi}{2})}</parameter>
-</function>
+</tool>
 
 --------------------- END OF EXAMPLE ---------------------
 
@@ -234,7 +234,7 @@ PLEASE follow the format strictly! PLEASE EMIT ONE AND ONLY ONE FUNCTION CALL PE
 """
 
 # Regex patterns for function call parsing
-FN_REGEX_PATTERN = r'<function=([^>]+)>\n(.*?)</function>'
+FN_REGEX_PATTERN = r'<tool=([^>]+)>\n(.*?)</tool>'
 FN_PARAM_REGEX_PATTERN = r'<parameter=([^>]+)>(.*?)</parameter>'
 
 # Add new regex pattern for tool execution results
@@ -252,7 +252,7 @@ def convert_tool_call_to_string(tool_call: dict) -> str:
     if tool_call['type'] != 'function':
         raise FunctionCallConversionError("Tool call type must be 'function'.")
 
-    ret = f"<function={tool_call['function']['name']}>\n"
+    ret = f"<tool={tool_call['function']['name']}>\n"
     try:
         args = json.loads(tool_call['function']['arguments'])
     except json.JSONDecodeError as e:
@@ -268,7 +268,7 @@ def convert_tool_call_to_string(tool_call: dict) -> str:
         if is_multiline:
             ret += '\n'
         ret += '</parameter>\n'
-    ret += '</function>'
+    ret += '</tool>'
     return ret
 
 
@@ -570,11 +570,11 @@ def _extract_and_validate_params(
 
 def _fix_stopword(content: str) -> str:
     """Fix the issue when some LLM would NOT return the stopword."""
-    if '<function=' in content and content.count('<function=') == 1:
+    if '<tool=' in content and content.count('<tool=') == 1:
         if content.endswith('</'):
-            content = content.rstrip() + 'function>'
+            content = content.rstrip() + 'tool>'
         else:
-            content = content + '\n</function>'
+            content = content + '\n</tool>'
     return content
 
 
@@ -748,10 +748,10 @@ def convert_non_fncall_messages_to_fncall_messages(
                 if isinstance(content, list):
                     assert content and content[-1]['type'] == 'text'
                     content[-1]['text'] = (
-                        content[-1]['text'].split('<function=')[0].strip()
+                        content[-1]['text'].split('<tool=')[0].strip()
                     )
                 elif isinstance(content, str):
-                    content = content.split('<function=')[0].strip()
+                    content = content.split('<tool=')[0].strip()
                 else:
                     raise FunctionCallConversionError(
                         f'Unexpected content type {type(content)}. Expected str or list. Content: {content}'

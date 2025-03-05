@@ -45,8 +45,8 @@ Original messages:
 [
   {"role": "system", "content": "You are a helpful assistant."},
   {"role": "user", "content": "Who won the world cup in 2022?"},
-  {"role": "assistant", "content": "Let me check <function>get_world_cup_winner(2022)</function>"},
-  {"role": "function", "content": "Argentina"},
+  {"role": "assistant", "content": "Let me check <tool>get_world_cup_winner(2022)</tool>"},
+  {"role": "tool", "content": "Argentina"},
   {"role": "user", "content": "What was the score?"}
 ]
 ```
@@ -60,7 +60,7 @@ Transformed messages:
   },
   {
     "role": "assistant",
-    "content": "Let me check <function>get_world_cup_winner(2022)</function>\nObservation: Argentina",
+    "content": "Let me check <tool>get_world_cup_winner(2022)</tool>\nObservation: Argentina",
     "prefix": true
   },
   {
@@ -79,7 +79,7 @@ Next turn (after assistant responds and function is called):
   },
   {
     "role": "assistant",
-    "content": "Let me check <function>get_world_cup_winner(2022)</function>\nObservation: Argentina\nLet me see by how much <function>get_world_cup_score(2022)</function>\nObservation: Argentina 3(4) - France 3(2) on penalties",
+    "content": "Let me check <tool>get_world_cup_winner(2022)</tool>\nObservation: Argentina\nLet me see by how much <tool>get_world_cup_score(2022)</tool>\nObservation: Argentina 3(4) - France 3(2) on penalties",
     "prefix": true
   },
   {
@@ -139,12 +139,12 @@ enable_history_truncation = true
 In this example, the user asks about the 2022 World Cup:
 
 1. User: "Who won the world cup in 2022?"
-2. Assistant: "Let me check <function>get_world_cup_winner(2022)</function>"
-3. Function returns: "Argentina"
+2. Assistant: "Let me check <tool>get_world_cup_winner(2022)</tool>"
+3. Tool returns: "Argentina"
 4. User: "What was the score?"
-5. Assistant (with prefix): "Let me check <function>get_world_cup_winner(2022)</function>\nObservation: Argentina\nLet me see by how much <function>get_world_cup_score(2022)</function>"
-6. Function returns: "Argentina 3(4) - France 3(2) on penalties"
+5. Assistant (with prefix): "Let me check <tool>get_world_cup_winner(2022)</tool>\nObservation: Argentina\nLet me see by how much <tool>get_world_cup_score(2022)</tool>"
+6. Tool returns: "Argentina 3(4) - France 3(2) on penalties"
 7. User: "Who scored for Argentina?"
-8. Assistant (with prefix): "Let me check <function>get_world_cup_winner(2022)</function>\nObservation: Argentina\nLet me see by how much <function>get_world_cup_score(2022)</function>\nObservation: Argentina 3(4) - France 3(2) on penalties\nLet me find out who scored for Argentina <function>get_world_cup_scorers(2022, 'Argentina')</function>"
+8. Assistant (with prefix): "Let me check <tool>get_world_cup_winner(2022)</tool>\nObservation: Argentina\nLet me see by how much <tool>get_world_cup_score(2022)</tool>\nObservation: Argentina 3(4) - France 3(2) on penalties\nLet me find out who scored for Argentina <tool>get_world_cup_scorers(2022, 'Argentina')</tool>"
 
-This approach allows the assistant to build a coherent narrative across multiple turns, incorporating both its own responses and the results of function calls.
+This approach allows the assistant to build a coherent narrative across multiple turns, incorporating both its own responses and the results of tool calls.
