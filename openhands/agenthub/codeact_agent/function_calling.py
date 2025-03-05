@@ -54,6 +54,45 @@ def combine_thought(action: Action, thought: str) -> Action:
 
 def response_to_actions(response: ModelResponse, agent=None) -> list[Action]:
     actions: list[Action] = []
+
+    # Check if this is a case where the model is trying to call execute_ipython_cell
+    # but the system is trying to interpret it as a finish function call
+    if hasattr(response, 'error') and 'Missing required parameters for function' in str(
+        response.error
+    ):
+        logger.warning(f'Detected error in function call: {response.error}')
+        # Try to extract the actual function call from the content
+        if hasattr(response, 'choices') and len(response.choices) > 0:
+            assistant_msg = response.choices[0].message
+            if (
+                hasattr(assistant_msg, 'content')
+                and assistant_msg.content
+                and ('<function=' in assistant_msg.content or '<tool=' in assistant_msg.content)
+            ):
+                import re
+
+                # Try to match both <function=...> and <tool=...> formats
+                function_match = re.search(r'<function=([^>]+)>|<tool=([^>]+)>', assistant_msg.content)
+                if function_match:
+                    # Get the function/tool name from whichever group matched
+                    function_name = function_match.group(1) if function_match.group(1) else function_match.group(2)
+                    if function_name == 'execute_ipython_cell':
+                        # This is likely a case where the model is trying to call execute_ipython_cell
+                        # Try to extract the code parameter using both formats
+                        code_match = re.search(
+                            r'<parameter=code>(.*?)</parameter>|<code>(.*?)</code>',
+                            assistant_msg.content,
+                            re.DOTALL,
+                        )
+                        if code_match:
+                            # Get the code from whichever group matched
+                            code = code_match.group(1) if code_match.group(1) else code_match.group(2)
+                            logger.info(
+                                'Extracted code from content and creating IPythonRunCellAction'
+                            )
+                            actions.append(IPythonRunCellAction(code=code))
+                            return actions
+
     assert len(response.choices) == 1, 'Only one choice is supported for now'
     choice = response.choices[0]
     assistant_msg = choice.message
@@ -109,22 +148,45 @@ def response_to_actions(response: ModelResponse, agent=None) -> list[Action]:
             # AgentFinishAction
             # ================================================
             elif tool_call.function.name == FinishTool['function']['name']:
+                # Validate required parameters for finish function
+                if 'message' not in arguments:
+                    logger.warning(
+                        "Missing required parameter 'message' for finish function"
+                    )
+                    # Instead of raising an error, provide a default value
+                    arguments['message'] = 'Task completed.'
+
+                if 'task_completed' not in arguments:
+                    logger.warning(
+                        "Missing required parameter 'task_completed' for finish function"
+                    )
+                    # Instead of raising an error, provide a default value
+                    arguments['task_completed'] = 'true'
+
                 # Check if Python has been used (if agent is provided)
                 if agent and hasattr(agent, 'python_used') and not agent.python_used:
                     # Python hasn't been used, create a message action instead
-                    error_message = "I need to use Python to solve this problem. Let me try using Python first."
-                    logger.warning("Blocked finish action because Python hasn't been used yet")
+                    error_message = 'I need to use Python to solve this problem. Let me try using Python first.'
+                    logger.warning(
+                        "Blocked finish action because Python hasn't been used yet"
+                    )
                     action = MessageAction(
                         content=error_message,
                         wait_for_response=False,
                     )
                 # Check if this is the first time the agent is trying to finish
-                elif agent and hasattr(agent, 'has_tried_finish') and not agent.has_tried_finish:
+                elif (
+                    agent
+                    and hasattr(agent, 'has_tried_finish')
+                    and not agent.has_tried_finish
+                ):
                     # First time trying to finish, ask for verification
                     agent.has_tried_finish = True
                     agent.saved_finish_args = arguments  # Save the arguments for later
-                    verification_message = "Have you verified your solution with code? Please run one final verification to confirm your answer is correct."
-                    logger.info("Asking for verification before accepting finish action")
+                    verification_message = 'Have you verified your solution with code? Please run one final verification to confirm your answer is correct.'
+                    logger.info(
+                        'Asking for verification before accepting finish action'
+                    )
                     action = MessageAction(
                         content=verification_message,
                         wait_for_response=False,

@@ -1,0 +1,17 @@
+[llm.sft]
+model = "hosted_vllm/AlexCuadron/DSR1-Qwen-14B-8a4e8f3a-checkpoint-64"
+temperature = 0.0
+api_key = "ddd"
+max_input_tokens = 4096
+max_output_tokens = 4096
+base_url = "http://127.0.0.1:8001/v1/"
+custom_llm_provider = "prefix_provider"
+
+[core]
+workspace_base = "./workspace"
+default_agent = "CodeActAgent"
+
+[agent]
+codeact_enable_browsing = true
+codeact_enable_jupyter = true
+enable_history_truncation = true

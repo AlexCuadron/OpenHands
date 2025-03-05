@@ -29,8 +29,8 @@ from openhands.core.message import Message
 from openhands.llm.debug_mixin import DebugMixin
 from openhands.llm.fn_call_converter import (
     STOP_WORDS,
-    convert_fncall_messages_to_non_fncall_messages,
-    convert_non_fncall_messages_to_fncall_messages,
+    convert_tool_messages_to_non_tool_messages as convert_fncall_messages_to_non_fncall_messages,
+    convert_non_tool_messages_to_tool_messages as convert_non_fncall_messages_to_fncall_messages,
 )
 from openhands.llm.metrics import Metrics
 from openhands.llm.retry_mixin import RetryMixin
