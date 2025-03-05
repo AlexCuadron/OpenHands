@@ -188,20 +188,26 @@ def response_to_actions(response: ModelResponse, agent=None) -> list[Action]:
             # AgentFinishAction
             # ================================================
             elif tool_call.function.name == FinishTool['function']['name']:
-                # Validate required parameters for finish function
+                # Handle optional parameters for finish function
                 if 'message' not in arguments:
-                    logger.warning(
-                        "Missing required parameter 'message' for finish function"
+                    logger.info(
+                        "Optional parameter 'message' not provided for finish function, using default"
                     )
-                    # Instead of raising an error, provide a default value
+                    # Provide a default value
                     arguments['message'] = 'Task completed.'
 
                 if 'task_completed' not in arguments:
-                    logger.warning(
-                        "Missing required parameter 'task_completed' for finish function"
+                    logger.info(
+                        "Optional parameter 'task_completed' not provided for finish function, using default"
                     )
-                    # Instead of raising an error, provide a default value
+                    # Provide a default value
                     arguments['task_completed'] = 'true'
+                    
+                # For benchmark problems, check if solution is provided
+                if 'solution' in arguments:
+                    logger.info(f"Solution provided: {arguments['solution']}")
+                else:
+                    logger.warning("No solution provided for finish function in benchmark problem")
 
                 # Check if Python has been used (if agent is provided)
                 if agent and hasattr(agent, 'python_used') and not agent.python_used:
