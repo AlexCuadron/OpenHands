@@ -235,7 +235,7 @@ PLEASE follow the format strictly! PLEASE EMIT ONE AND ONLY ONE FUNCTION CALL PE
 
 # Regex patterns for function call parsing
 FN_REGEX_PATTERN = r'<tool=([^>]+)>\n(.*?)</tool>'
-FN_PARAM_REGEX_PATTERN = r'<([^>]+)>(.*?)</\1>'
+FN_PARAM_REGEX_PATTERN = r'<(?!tool=)([^>]+)>(.*?)</\1>'
 
 # Add new regex pattern for tool execution results
 TOOL_RESULT_REGEX_PATTERN = r'EXECUTION RESULT of \[(.*?)\]:\n(.*)'
