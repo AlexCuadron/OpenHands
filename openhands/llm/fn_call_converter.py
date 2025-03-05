@@ -27,12 +27,12 @@ You have access to the following tools:
 If you choose to call a tool ONLY reply in the following format with NO suffix:
 
 <tool=example_tool_name>
-<parameter=example_parameter_1>value_1</parameter>
-<parameter=example_parameter_2>
+<example_parameter_1>value_1</example_parameter_1>
+<example_parameter_2>
 This is the value for the second parameter
 that can span
 multiple lines
-</parameter>
+</example_parameter_2>
 </tool>
 
 <IMPORTANT>
@@ -75,7 +75,7 @@ Wait, this is a problem because division by zero is undefined. Since $x = 0$ and
 Let me verify my reasoning with Python:
 
 <tool=execute_ipython_cell>
-<parameter=code>
+<code>
 import numpy as np
 import math
 
@@ -93,7 +93,7 @@ try:
     print(f"θ = arctan({y}/{x}) = {theta_standard} radians")
 except ZeroDivisionError:
     print(f"Error: Division by zero when calculating arctan({y}/{x})")
-</parameter>
+</code>
 </tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
@@ -106,7 +106,7 @@ ASSISTANT: I see that my calculation for $r = 3$ is correct, but as I suspected,
 For points on the y-axis, I need to use a different approach. Let me try using the `arctan2` function, which is specifically designed to handle all quadrants and special cases:
 
 <tool=execute_ipython_cell>
-<parameter=code>
+<code>
 import numpy as np
 
 # Given point
@@ -123,7 +123,7 @@ if theta < 0:
     print(f"Adjusted θ to be in [0, 2π) range: {theta} radians")
 else:
     print(f"θ is already in [0, 2π) range: {theta} radians")
-</parameter>
+</code>
 </tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
@@ -141,7 +141,7 @@ This matches my reasoning that when a point is on the positive y-axis, the angle
 Let me double-check that this is the correct representation in polar coordinates by converting back to rectangular coordinates:
 
 <tool=execute_ipython_cell>
-<parameter=code>
+<code>
 import numpy as np
 
 # Polar coordinates
@@ -163,7 +163,7 @@ print(f"Converted back point: ({x_back:.10f}, {y_back:.10f})")
 # Check for numerical precision issues
 if abs(x_back) < 1e-10:
     print("x is effectively zero (within numerical precision)")
-</parameter>
+</code>
 </tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
@@ -182,7 +182,7 @@ ASSISTANT: Perfect! The conversion back to rectangular coordinates confirms our 
 Let me verify one more thing - I want to make sure I understand the range requirement correctly. The problem asks for $0 \\le \\theta < 2\\pi$:
 
 <tool=execute_ipython_cell>
-<parameter=code>
+<code>
 import numpy as np
 
 # Check if our theta is in the required range
@@ -199,7 +199,7 @@ print(f"Is θ in the range [0, 2π)? {in_range}")
 
 # Express in terms of π for mathematical notation
 print(f"θ = {theta/pi}π radians")
-</parameter>
+</code>
 </tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
@@ -217,7 +217,7 @@ ASSISTANT: This confirms that our answer is correct and meets all the requiremen
 Therefore, the polar coordinates of the point $(0,3)$ are $(3, \\frac{\\pi}{2})$.
 
 <tool=finish>
-<parameter=solution>\\boxed{(3, \\frac{\\pi}{2})}</parameter>
+<solution>\\boxed{(3, \\frac{\\pi}{2})}</solution>
 </tool>
 
 --------------------- END OF EXAMPLE ---------------------
@@ -235,7 +235,7 @@ PLEASE follow the format strictly! PLEASE EMIT ONE AND ONLY ONE FUNCTION CALL PE
 
 # Regex patterns for function call parsing
 FN_REGEX_PATTERN = r'<tool=([^>]+)>\n(.*?)</tool>'
-FN_PARAM_REGEX_PATTERN = r'<parameter=([^>]+)>(.*?)</parameter>'
+FN_PARAM_REGEX_PATTERN = r'<([^>]+)>(.*?)</\1>'
 
 # Add new regex pattern for tool execution results
 TOOL_RESULT_REGEX_PATTERN = r'EXECUTION RESULT of \[(.*?)\]:\n(.*)'
@@ -261,13 +261,13 @@ def convert_tool_call_to_string(tool_call: dict) -> str:
         ) from e
     for param_name, param_value in args.items():
         is_multiline = isinstance(param_value, str) and '\n' in param_value
-        ret += f'<parameter={param_name}>'
+        ret += f'<{param_name}>'
         if is_multiline:
             ret += '\n'
         ret += f'{param_value}'
         if is_multiline:
             ret += '\n'
-        ret += '</parameter>\n'
+        ret += f'</{param_name}>\n'
     ret += '</tool>'
     return ret
 
