@@ -738,3 +738,7 @@ def convert_from_multiple_tool_calls_to_single_tool_call_messages(
             f'Found pending tool calls but no tool result: {pending_tool_calls=}'
         )
     return converted_messages
+
+# Aliases for backward compatibility
+convert_tool_messages_to_non_tool_messages = convert_from_tool_calling_messages
+convert_non_tool_messages_to_tool_messages = convert_to_tool_calling_messages
