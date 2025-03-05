@@ -2,16 +2,21 @@ import asyncio
 import copy
 import os
 import re
-from typing import Optional
+from typing import Optional, Dict, List, Any
 
 import pandas as pd
 from datasets import load_dataset
 
 import openhands.agenthub.codeact_agent.function_calling as codeact_function_calling
-from evaluation.benchmarks.math500.helper import (
+from evaluation.benchmarks.aime2024.helper import (
     FAKE_RESPONSES,
     INST_SUFFIXES,
     INSTRUCTIONS_ADDENDUM,
+)
+from evaluation.benchmarks.aime2024.thinking_agent import (
+    analyze_overthinking,
+    get_thinking_agent_llm,
+    should_discard_solution,
 )
 from evaluation.utils.shared import (
     EvalMetadata,
@@ -70,7 +75,7 @@ def get_config(
     
     # Set temperature to 0.6 as recommended for mathematical problems
     llm_config.temperature = 0.6
-    logger.info(f"Set temperature to 0.6 for MATH500 benchmark")
+    logger.info(f'Set temperature to 0.6 for AIME2024 benchmark')
 
     # Disable native tool calling for Together.ai models
     if llm_config and (
@@ -84,7 +89,7 @@ def get_config(
     agent_config = config.get_agent_config(metadata.agent_class)
     agent_config.enable_prompt_extensions = False
 
-    # For MATH500 benchmark, configure the agent with the right tools based on the allowed_tools parameter
+    # For AIME2024 benchmark, configure the agent with the right tools based on the allowed_tools parameter
     if metadata.agent_class == 'CodeActAgent':
         # Default configuration - disable browsing
         agent_config.codeact_enable_browsing = False
@@ -106,7 +111,7 @@ def get_config(
                 codeact_function_calling.FinishTool,
             ]
             logger.info(
-                'Configured CodeActAgent for MATH500 benchmark with IPython tool only'
+                'Configured CodeActAgent for AIME2024 benchmark with IPython tool only'
             )
         elif allowed_tools == 'bash_only':
             # Only enable Bash tool
@@ -120,7 +125,7 @@ def get_config(
                 codeact_function_calling.FinishTool,
             ]
             logger.info(
-                'Configured CodeActAgent for MATH500 benchmark with Bash tool only'
+                'Configured CodeActAgent for AIME2024 benchmark with Bash tool only'
             )
         elif allowed_tools == 'no_editor':
             # Enable Bash and IPython but no editor
@@ -135,7 +140,7 @@ def get_config(
                 codeact_function_calling.FinishTool,
             ]
             logger.info(
-                'Configured CodeActAgent for MATH500 benchmark with Bash and IPython tools (no editor)'
+                'Configured CodeActAgent for AIME2024 benchmark with Bash and IPython tools (no editor)'
             )
         else:  # 'all' or any other value
             # Enable all tools except browsing
@@ -146,7 +151,7 @@ def get_config(
                 metadata.details = {}
             metadata.details['override_tools'] = None
             logger.info(
-                'Configured CodeActAgent for MATH500 benchmark with all tools (except browsing)'
+                'Configured CodeActAgent for AIME2024 benchmark with all tools (except browsing)'
             )
 
     # copy 'draft_editor' config if exists
@@ -173,7 +178,7 @@ def extract_answer(text: str) -> Optional[str]:
     boxed_pattern = r'\\boxed{([^{}]*)}'
     boxed_match = re.search(boxed_pattern, text, re.DOTALL)
     if boxed_match:
-        return boxed_match.group(0).strip()  # Return the whole match including \boxed{}
+        return boxed_match.group(1).strip()
 
     # Look for "The answer is" pattern with variations
     answer_patterns = [
@@ -216,7 +221,7 @@ def extract_answer(text: str) -> Optional[str]:
         if our_answer_match:
             return our_answer_match.group(1).strip()
 
-    # Look for a standalone number at the end of the text
+    # Look for a standalone number at the end of the text (common in AIME problems)
     final_number_patterns = [
         r'(?:^|\n|\.)[\s\t]*(\d+)[\s\t]*$',
         r'(?:^|\n|\.)[^\d]*(\d+)[^\d]*$',
@@ -306,7 +311,7 @@ def normalize_answer(answer: str) -> str:
             # For comparison, keep the full value including the $ symbol
             return currency_value
     
-    # For MATH problems with pure numbers, we typically want just the number
+    # For AIME problems with pure numbers, we typically want just the number
     # Check if the answer is purely numeric
     if re.match(r'^\d+$', answer) or re.match(r'^\d+\.\d+$', answer):
         return answer
@@ -324,74 +329,7 @@ def normalize_answer(answer: str) -> str:
     return answer
 
 
-def check_answer_correctness(predicted: str, reference: str) -> bool:
-    """Check if the predicted answer matches the reference answer."""
-    if predicted is None:
-        logger.warning('Predicted answer is None')
-        return False
-
-    # Normalize both answers
-    predicted_norm = normalize_answer(predicted)
-    reference_norm = normalize_answer(reference)
-
-    # Log the normalized answers for debugging
-    logger.info(f"Normalized predicted answer: '{predicted_norm}'")
-    logger.info(f"Normalized reference answer: '{reference_norm}'")
-
-    # Check if either answer contains a currency symbol
-    has_currency = ('$' in predicted_norm or '$' in reference_norm or 
-                   '£' in predicted_norm or '£' in reference_norm or 
-                   '€' in predicted_norm or '€' in reference_norm)
-    
-    # Try numerical comparison if possible and not dealing with currency
-    if not has_currency:
-        try:
-            if predicted_norm and reference_norm:
-                # Try to convert to float first to handle decimal values
-                try:
-                    predicted_float = float(predicted_norm)
-                    reference_float = float(reference_norm)
-                    
-                    # If both are integers (no decimal part), compare as integers
-                    if predicted_float.is_integer() and reference_float.is_integer():
-                        predicted_int = int(predicted_float)
-                        reference_int = int(reference_float)
-                        is_correct = predicted_int == reference_int
-                        numerical_comparison = True
-                        logger.info(f"Using integer comparison: {predicted_int} {'=' if is_correct else '≠'} {reference_int}")
-                    else:
-                        # Compare as floats with a small tolerance for floating-point errors
-                        is_correct = abs(predicted_float - reference_float) < 1e-9
-                        numerical_comparison = True
-                        logger.info(f"Using float comparison: {predicted_float} {'=' if is_correct else '≠'} {reference_float}")
-                except ValueError:
-                    # If float conversion fails, try integer conversion
-                    predicted_int = int(predicted_norm)
-                    reference_int = int(reference_norm)
-                    is_correct = predicted_int == reference_int
-                    numerical_comparison = True
-                    logger.info(f"Using integer comparison: {predicted_int} {'=' if is_correct else '≠'} {reference_int}")
-            else:
-                is_correct = False
-                numerical_comparison = False
-                logger.warning("Cannot perform numerical comparison with empty values")
-        except (ValueError, TypeError):
-            # Fall back to string comparison
-            is_correct = predicted_norm == reference_norm
-            numerical_comparison = False
-            logger.info(f"Using string comparison: '{predicted_norm}' {'=' if is_correct else '≠'} '{reference_norm}'")
-    else:
-        # For currency values, use direct string comparison
-        is_correct = predicted_norm == reference_norm
-        numerical_comparison = False
-        logger.info(f"Using currency string comparison: '{predicted_norm}' {'=' if is_correct else '≠'} '{reference_norm}'")
-
-    if is_correct:
-        logger.info('✓ Answer is correct!')
-    else:
-        logger.warning('✗ Answer is incorrect')
-
-    return is_correct
+# Function removed - logic moved to test_result creation
 
 
 def process_instance(
@@ -470,9 +408,6 @@ def process_instance(
     # Extract the answer from the agent's response
     predicted_answer = None
 
-    # Try multiple methods to extract the answer
-    possible_answers = []
-
     # Check if the agent used the finish tool with a solution
     finish_action = next(
         (
@@ -482,6 +417,9 @@ def process_instance(
         ),
         None,
     )
+
+    # Try multiple methods to extract the answer
+    possible_answers = []
 
     # Method 1: Extract from finish action solution attribute
     if finish_action and hasattr(finish_action, 'solution') and finish_action.solution:
@@ -520,6 +458,40 @@ def process_instance(
         if extracted:
             possible_answers.append(extracted)
             logger.info(f'Extracted answer from last message: {extracted}')
+        else:
+            logger.warning(
+                f'Could not extract answer from last message: {last_message[:100]}...'
+            )
+
+    # Method 5: Look for any finish action in the history
+    for event in reversed(state.history):
+        if isinstance(event, dict) and event.get('action') == 'finish':
+            # Try to extract from solution field
+            if 'solution' in event and event['solution']:
+                possible_answers.append(event['solution'])
+                logger.info(
+                    f"Found solution in finish action dict: {event['solution']}"
+                )
+
+            # Try to extract from outputs dictionary
+            if (
+                'outputs' in event
+                and isinstance(event['outputs'], dict)
+                and 'solution' in event['outputs']
+            ):
+                possible_answers.append(event['outputs']['solution'])
+                logger.info(
+                    f"Found solution in finish action dict outputs: {event['outputs']['solution']}"
+                )
+
+            # Try to extract from thought field
+            if 'thought' in event and event['thought']:
+                extracted_from_thought = extract_answer(event['thought'])
+                if extracted_from_thought:
+                    possible_answers.append(extracted_from_thought)
+                    logger.info(
+                        f'Extracted answer from finish action dict thought: {extracted_from_thought}'
+                    )
 
     # Choose the best answer from the possible answers
     if possible_answers:
@@ -527,8 +499,8 @@ def process_instance(
         normalized_answers = [normalize_answer(ans) for ans in possible_answers]
         logger.info(f'Normalized possible answers: {normalized_answers}')
 
-        # For MATH problems, prefer answers that are just numbers
-        numeric_answers = [ans for ans in possible_answers if normalize_answer(ans).isdigit()]
+        # For AIME problems, prefer answers that are just numbers
+        numeric_answers = [ans for ans in normalized_answers if ans.isdigit()]
         if numeric_answers:
             predicted_answer = numeric_answers[0]
             logger.info(f'Selected numeric answer: {predicted_answer}')
@@ -543,22 +515,51 @@ def process_instance(
     predicted_norm = normalize_answer(predicted_answer) if predicted_answer is not None else ''
     reference_norm = normalize_answer(instance.answer) if instance.answer is not None else ''
     
-    # Try numerical comparison if possible
+    # Check if either answer contains a currency symbol
+    has_currency = ('$' in predicted_norm or '$' in reference_norm or 
+                   '£' in predicted_norm or '£' in reference_norm or 
+                   '€' in predicted_norm or '€' in reference_norm)
+    
+    # Try numerical comparison if possible and not dealing with currency
     numerical_comparison = False
-    try:
-        if predicted_norm and reference_norm:
-            predicted_int = int(predicted_norm)
-            reference_int = int(reference_norm)
-            is_correct = predicted_int == reference_int
-            numerical_comparison = True
-            logger.info(f"Using numerical comparison: {predicted_int} {'=' if is_correct else '≠'} {reference_int}")
-        else:
-            is_correct = False
-            logger.warning("Cannot perform numerical comparison with empty values")
-    except (ValueError, TypeError):
-        # Fall back to string comparison
+    if not has_currency:
+        try:
+            if predicted_norm and reference_norm:
+                # Try to convert to float first to handle decimal values
+                try:
+                    predicted_float = float(predicted_norm)
+                    reference_float = float(reference_norm)
+                    
+                    # If both are integers (no decimal part), compare as integers
+                    if predicted_float.is_integer() and reference_float.is_integer():
+                        predicted_int = int(predicted_float)
+                        reference_int = int(reference_float)
+                        is_correct = predicted_int == reference_int
+                        numerical_comparison = True
+                        logger.info(f"Using integer comparison: {predicted_int} {'=' if is_correct else '≠'} {reference_int}")
+                    else:
+                        # Compare as floats with a small tolerance for floating-point errors
+                        is_correct = abs(predicted_float - reference_float) < 1e-9
+                        numerical_comparison = True
+                        logger.info(f"Using float comparison: {predicted_float} {'=' if is_correct else '≠'} {reference_float}")
+                except ValueError:
+                    # If float conversion fails, try integer conversion
+                    predicted_int = int(predicted_norm)
+                    reference_int = int(reference_norm)
+                    is_correct = predicted_int == reference_int
+                    numerical_comparison = True
+                    logger.info(f"Using integer comparison: {predicted_int} {'=' if is_correct else '≠'} {reference_int}")
+            else:
+                is_correct = False
+                logger.warning("Cannot perform numerical comparison with empty values")
+        except (ValueError, TypeError):
+            # Fall back to string comparison
+            is_correct = predicted_norm == reference_norm
+            logger.info(f"Using string comparison: '{predicted_norm}' {'=' if is_correct else '≠'} '{reference_norm}'")
+    else:
+        # For currency values, use direct string comparison
         is_correct = predicted_norm == reference_norm
-        logger.info(f"Using string comparison: '{predicted_norm}' {'=' if is_correct else '≠'} '{reference_norm}'")
+        logger.info(f"Using currency string comparison: '{predicted_norm}' {'=' if is_correct else '≠'} '{reference_norm}'")
 
     test_result = {
         'predicted_answer': predicted_answer,
@@ -567,8 +568,8 @@ def process_instance(
         'reference_normalized': reference_norm,
         'comparison_method': 'numerical' if numerical_comparison else 'string',
         'is_correct': is_correct,
-        'subject': instance.subject,
-        'level': instance.level,
+        'id': instance.id,
+        'url': instance.url if 'url' in instance else None,
     }
 
     # history is now available as a stream of events, rather than list of pairs of (Action, Observation)
@@ -577,6 +578,45 @@ def process_instance(
     histories = compatibility_for_eval_history_pairs(state.history)
     metrics = state.metrics.get() if state.metrics else None
 
+    # Check for overthinking if enabled in metadata
+    overthinking_threshold = metadata.details.get('overthinking_threshold', None) if metadata.details else None
+    
+    if overthinking_threshold is not None:
+        try:
+            # Initialize the ThinkingAgent LLM
+            thinking_agent_llm = get_thinking_agent_llm()
+            
+            # Create a directory for overthinking analysis files
+            overthinking_dir = os.path.join(metadata.eval_output_dir, 'overthinking_analysis')
+            os.makedirs(overthinking_dir, exist_ok=True)
+            
+            # Analyze the solution for overthinking
+            overthinking_score, analysis = analyze_overthinking(
+                state.history, 
+                thinking_agent_llm,
+                output_dir=overthinking_dir,
+                instance_id=str(instance.instance_id)
+            )
+            
+            # Add overthinking analysis to test_result
+            test_result['overthinking_score'] = overthinking_score
+            test_result['overthinking_analysis'] = analysis
+            
+            logger.info(f"Overthinking analysis completed. Score: {overthinking_score}/10")
+            logger.info(f"Overthinking analysis files saved to: {overthinking_dir}")
+            
+            # Check if the solution should be discarded based on the overthinking score
+            if should_discard_solution(overthinking_score, int(overthinking_threshold)):
+                logger.warning(f"Solution discarded due to high overthinking score: {overthinking_score} > {overthinking_threshold}")
+                
+                # Instead of just marking as incorrect, raise an exception to trigger a retry
+                raise Exception(f"Overthinking detected with score {overthinking_score} > threshold {overthinking_threshold}. Retrying...")
+            else:
+                test_result['solution_discarded'] = False
+        except Exception as e:
+            logger.error(f"Error during overthinking analysis: {e}")
+            test_result['overthinking_error'] = str(e)
+    
     # Save the output
     output = EvalOutput(
         instance_id=str(instance.instance_id),
@@ -591,8 +631,8 @@ def process_instance(
     return output
 
 
-# Custom argument parser for MATH500 benchmark
-def parse_math500_arguments():
+# Custom argument parser for AIME2024 benchmark
+def parse_aime2024_arguments():
     parser = get_parser()
 
     # Add custom argument for allowed tools
@@ -602,24 +642,28 @@ def parse_math500_arguments():
         default='all',
         help='Comma-separated list of allowed tools for the agent. Options: all, ipython_only, bash_only, no_editor',
     )
+    
+    # Add custom argument for overthinking threshold
+    parser.add_argument(
+        '--overthinking-threshold',
+        type=int,
+        default=None,
+        help='Threshold for overthinking score (0-10). Solutions with scores above this threshold will be discarded.',
+    )
 
     return parser.parse_args()
 
 
 if __name__ == '__main__':
-    args = parse_math500_arguments()
+    args = parse_aime2024_arguments()
 
-    # No need to change the agent class
-
-    # Load the MATH-500 dataset
-    dataset = load_dataset('HuggingFaceH4/MATH-500')
-    math500_df = dataset['test'].to_pandas()
+    # Load the AIME dataset
+    dataset = load_dataset('AI-MO/aimo-validation-aime')
+    aime_df = dataset['train'].to_pandas()
 
     # Add instance_id if not present
-    if 'instance_id' not in math500_df.columns:
-        math500_df['instance_id'] = math500_df['unique_id'].apply(
-            lambda x: x.replace('/', '_')
-        )
+    if 'instance_id' not in aime_df.columns:
+        aime_df['instance_id'] = aime_df['id'].apply(lambda x: f'aime_{x}')
 
     llm_config = None
     if args.llm_config:
@@ -642,7 +686,7 @@ if __name__ == '__main__':
 
     metadata = make_metadata(
         llm_config,
-        'MATH500',
+        'AIME2024',
         args.agent_cls,
         args.max_iterations,
         args.eval_note,
@@ -654,6 +698,12 @@ if __name__ == '__main__':
     if metadata.details is None:
         metadata.details = {}
     metadata.details['allowed_tools'] = args.allowed_tools
+    
+    # Add the overthinking threshold if provided
+    if args.overthinking_threshold is not None:
+        metadata.details['overthinking_threshold'] = args.overthinking_threshold
+        logger.info(f'\nUsing overthinking threshold: {args.overthinking_threshold}\n')
+    
     output_file = os.path.join(metadata.eval_output_dir, 'output.jsonl')
 
     # Parse dataset IDs if provided
@@ -663,7 +713,7 @@ if __name__ == '__main__':
         logger.info(f'\nUsing specific dataset IDs: {eval_ids}\n')
 
     instances = prepare_dataset(
-        math500_df,
+        aime_df,
         output_file,
         args.eval_n_limit,
         eval_ids=eval_ids,

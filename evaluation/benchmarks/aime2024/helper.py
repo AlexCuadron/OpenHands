@@ -23,6 +23,7 @@ IMPORTANT GUIDELINES:
 - Use print statements liberally to see intermediate results
 - If code execution contradicts your reasoning, trust the code and adjust your approach
 - If your code produces errors, fix them immediately before proceeding
+- AIME problems typically have integer answers, so make sure your final answer is an integer
 - When you have the final answer, put it in a \\boxed{} notation AND use the finish tool with your solution as the parameter
 
 EXAMPLE STRUCTURE:
@@ -47,8 +48,8 @@ When you have the final answer, put it in a \\boxed{} notation AND use the finis
 """
 
 
-def math500_user_response(state, **kwargs):
-    """Custom response function for MATH-500 benchmark."""
+def aime2024_user_response(state, **kwargs):
+    """Custom response function for AIME2024 benchmark."""
     # First check if the agent has already provided a solution
     # Check if the agent used the finish tool
     finish_action = next(
@@ -64,7 +65,7 @@ def math500_user_response(state, **kwargs):
         # If the agent has used the finish tool, let it finish
         return '/exit'
     
-    # Also check for "The answer is" or "boxed{" in the last message (for backward compatibility)
+    # Also check for "The answer is" or boxed answer in the last message (for backward compatibility)
     last_message = next(
         (
             event.message
@@ -74,26 +75,25 @@ def math500_user_response(state, **kwargs):
         None,
     )
 
-    if last_message and ('boxed{' in last_message or '\\boxed{' in last_message or 'The answer is' in last_message):
+    if last_message and ('The answer is' in last_message or '\\boxed{' in last_message):
         # If the agent has provided a solution in text, let it finish
         return '/exit'
 
-    # Check if the agent has used Python code execution in the last few messages
+    # Check if there was a ModuleNotFoundError in recent messages
     recent_messages = [
         event.message
         for event in reversed(state.history[: len(state.history)])
         if hasattr(event, 'message') and event.message
     ][:3]  # Look at the last 3 messages
 
-    has_used_python = any(
-        'execute_ipython_cell' in msg or 'EXECUTION RESULT' in msg
+    module_error = any(
+        'ModuleNotFoundError' in msg or 'No module named' in msg
         for msg in recent_messages
         if msg
     )
 
-    # Check if there was a ModuleNotFoundError in recent messages
-    module_error = any(
-        'ModuleNotFoundError' in msg or 'No module named' in msg
+    has_used_python = any(
+        'execute_ipython_cell' in msg or 'EXECUTION RESULT' in msg
         for msg in recent_messages
         if msg
     )
@@ -126,7 +126,7 @@ def math500_user_response(state, **kwargs):
 
 
 FAKE_RESPONSES = {
-    'CodeActAgent': math500_user_response,
+    'CodeActAgent': aime2024_user_response,
 }
 
 INST_SUFFIXES: dict[str, str] = {
