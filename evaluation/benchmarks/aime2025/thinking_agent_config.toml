@@ -1,0 +1,8 @@
+[llm]
+model = "claude-3-5-sonnet-20241022"
+temperature = 0.0
+max_output_tokens = 4096
+num_retries = 3
+retry_min_wait = 4
+retry_max_wait = 10
+retry_multiplier = 2
