@@ -170,5 +170,20 @@ def transform_to_prefix_format(messages: List[Dict[str, Any]]) -> List[Dict[str,
     
     return transformed_messages
 
-# Register our custom provider with LiteLLM
-litellm.register_provider("prefix_provider", prefix_completion)
+# Register our custom provider with LiteLLM if the method is available
+try:
+    if hasattr(litellm, 'register_provider'):
+        litellm.register_provider("prefix_provider", prefix_completion)
+    else:
+        logger.warning("litellm.register_provider is not available. Using a workaround.")
+        # Workaround: Monkey patch litellm.completion for prefix_provider
+        original_completion = litellm.completion
+        
+        def patched_completion(*args, **kwargs):
+            if kwargs.get('custom_llm_provider') == 'prefix_provider':
+                return prefix_completion(*args, **kwargs)
+            return original_completion(*args, **kwargs)
+        
+        litellm.completion = patched_completion
+except Exception as e:
+    logger.error(f"Failed to register prefix_provider: {e}")
