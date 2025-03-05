@@ -55,6 +55,31 @@ def combine_thought(action: Action, thought: str) -> Action:
 def response_to_actions(response: ModelResponse, agent=None) -> list[Action]:
     actions: list[Action] = []
     
+    # CRITICAL FIX: If we see an error about missing parameters for 'finish' but the content
+    # contains a code parameter, this is almost certainly an execute_ipython_cell call
+    # that's being misinterpreted. Handle this case first and directly.
+    if (hasattr(response, 'error') and 
+        'Missing required parameters for function' in str(response.error) and
+        'finish' in str(response.error)):
+        
+        logger.warning(f'Detected potential misinterpretation: {response.error}')
+        
+        # Check if we have content with a code parameter
+        if hasattr(response, 'choices') and len(response.choices) > 0:
+            assistant_msg = response.choices[0].message
+            if hasattr(assistant_msg, 'content') and assistant_msg.content:
+                content = assistant_msg.content
+                
+                # If we see a code parameter, this is definitely an execute_ipython_cell call
+                if '<parameter=code>' in content:
+                    import re
+                    code_match = re.search(r'<parameter=code>(.*?)</parameter>', content, re.DOTALL)
+                    if code_match:
+                        code = code_match.group(1)
+                        logger.info('CRITICAL FIX: Recovered IPython code from misinterpreted finish call')
+                        actions.append(IPythonRunCellAction(code=code))
+                        return actions
+    
     # First, check if we can directly extract an execute_ipython_cell call from the content
     # This is a common operation and we want to handle it directly before any complex parsing
     if hasattr(response, 'choices') and len(response.choices) > 0:
@@ -63,16 +88,21 @@ def response_to_actions(response: ModelResponse, agent=None) -> list[Action]:
             content = assistant_msg.content
             import re
             
-            # Direct pattern match for IPython cell execution
-            ipython_pattern = r'<function=execute_ipython_cell>.*?<parameter=code>(.*?)</parameter>.*?</function>'
-            ipython_match = re.search(ipython_pattern, content, re.DOTALL)
+            # Direct pattern match for IPython cell execution - try multiple patterns
+            ipython_patterns = [
+                r'<function=execute_ipython_cell>.*?<parameter=code>(.*?)</parameter>.*?</function>',
+                r'<function=execute_ipython_cell>.*?<parameter=code>(.*?)</parameter>',  # Handle missing closing tag
+                r'<function=execute_ipython_cell[\s\n]*><parameter=code>(.*?)</parameter>'  # Handle no space between tags
+            ]
             
-            if ipython_match:
-                # We found a direct match for execute_ipython_cell
-                code = ipython_match.group(1)
-                logger.info('Directly extracted IPython code from content')
-                actions.append(IPythonRunCellAction(code=code))
-                return actions
+            for pattern in ipython_patterns:
+                ipython_match = re.search(pattern, content, re.DOTALL)
+                if ipython_match:
+                    # We found a direct match for execute_ipython_cell
+                    code = ipython_match.group(1)
+                    logger.info(f'Directly extracted IPython code from content using pattern: {pattern}')
+                    actions.append(IPythonRunCellAction(code=code))
+                    return actions
             
             # Fallback: Check if there's a code parameter anywhere in the content
             # This is a strong indicator of an execute_ipython_cell call even if malformed

@@ -400,7 +400,7 @@ PLEASE follow the format strictly! PLEASE EMIT ONE AND ONLY ONE FUNCTION CALL PE
 """
 
 # Regex patterns for function call parsing
-FN_REGEX_PATTERN = r'<function=([^>]+)>\n(.*?)</function>'
+FN_REGEX_PATTERN = r'<function=([^>]+)>[\n]?(.*?)</function>'
 FN_PARAM_REGEX_PATTERN = r'<parameter=([^>]+)>(.*?)</parameter>'
 
 # Add new regex pattern for tool execution results
