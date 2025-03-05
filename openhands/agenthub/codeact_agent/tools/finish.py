@@ -12,9 +12,9 @@ The message should include:
 - Explanation if you're unable to complete the task
 - Any follow-up questions if more information is needed
 
-The task_completed field should be set to True if you believed you have completed the task, and False otherwise.
+The task_completed field is optional and can be set to True if you believed you have completed the task, and False otherwise. If not provided, it defaults to True.
 
-IMPORTANT: 
+IMPORTANT:
 1. You MUST use Python (execute_ipython_cell) at least once before using this tool. If you haven't used Python yet, you will not be allowed to finish.
 2. For benchmark problems (like MATH-500 or AIME), you MUST use the solution parameter to provide your final answer. The solution parameter should contain ONLY the answer value without any explanatory text.
 
@@ -31,7 +31,7 @@ FinishTool = ChatCompletionToolParam(
         description=_FINISH_DESCRIPTION,
         parameters={
             'type': 'object',
-            'required': ['message', 'task_completed'],
+            'required': ['message'],
             'properties': {
                 'message': {
                     'type': 'string',
