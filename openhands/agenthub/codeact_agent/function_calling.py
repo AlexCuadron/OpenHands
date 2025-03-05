@@ -229,7 +229,7 @@ def response_to_actions(response: ModelResponse, agent=None) -> list[Action]:
                     # First time trying to finish, ask for verification
                     agent.has_tried_finish = True
                     agent.saved_finish_args = arguments  # Save the arguments for later
-                    verification_message = 'Have you verified your solution with code? Please run one final verification to confirm your answer is correct.'
+                    verification_message = 'Think critically about your approach. Are you sure this is the correct value? Come up with an alternative approach and test it using code to verify your answer. This will help ensure your solution is robust and accurate.'
                     logger.info(
                         'Asking for verification before accepting finish action'
                     )
