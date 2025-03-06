@@ -4,6 +4,8 @@ that ensures all instructions are sent in a single user message.
 """
 
 import asyncio
+import threading
+import time
 from typing import Callable, Optional, Tuple
 
 from openhands.controller.agent_controller import AgentController
@@ -59,23 +61,6 @@ async def run_controller_single_message(
     # Add the initial user action to the event stream directly
     runtime.event_stream.add_event(initial_user_action, EventSource.USER)
     
-    # Set up event handling to prevent additional user messages
-    event_stream = runtime.event_stream
-    
-    # Define a flag to track if we need to finish
-    finish_requested = False
-    
-    def on_event(event: Event):
-        nonlocal finish_requested
-        if isinstance(event, AgentStateChangedObservation):
-            if event.agent_state == AgentState.AWAITING_USER_INPUT:
-                # If the agent is waiting for user input, we'll exit instead
-                logger.info('Agent is waiting for user input, but we are in single message mode. Exiting.')
-                finish_requested = True
-    
-    # Subscribe to events
-    event_stream.subscribe(EventStreamSubscriber.MAIN, on_event, event_stream.sid)
-    
     # Define the end states
     end_states = [
         AgentState.FINISHED,
@@ -85,18 +70,24 @@ async def run_controller_single_message(
         AgentState.STOPPED,
     ]
     
-    # Run the agent until it reaches an end state or finish is requested
+    # Run the agent until it reaches an end state
+    # We'll use a timeout to prevent it from running indefinitely
+    timeout = 300  # 5 minutes
+    start_time = time.time()
+    
     while controller.state.agent_state not in end_states:
-        if finish_requested:
-            # Set the agent state to FINISHED
-            # We need to create a new event loop for this
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                loop.run_until_complete(controller.set_agent_state_to(AgentState.FINISHED))
-            finally:
-                loop.close()
+        # Check if we've exceeded the timeout
+        if time.time() - start_time > timeout:
+            logger.warning(f'Timeout exceeded ({timeout} seconds). Exiting.')
             break
+        
+        # Check if the agent is waiting for user input
+        if controller.state.agent_state == AgentState.AWAITING_USER_INPUT:
+            logger.info('Agent is waiting for user input, but we are in single message mode. Exiting.')
+            # Instead of trying to set the agent state directly, we'll just break out of the loop
+            break
+        
+        # Sleep for a short time to avoid busy waiting
         await asyncio.sleep(1)
     
     # Return the final state
