@@ -59,11 +59,11 @@ def math500_user_response(state, **kwargs):
         ),
         None,
     )
-    
+
     if finish_action:
         # If the agent has used the finish tool, let it finish
         return '/exit'
-    
+
     # Also check for "The answer is" or "boxed{" in the last message (for backward compatibility)
     last_message = next(
         (
@@ -74,7 +74,11 @@ def math500_user_response(state, **kwargs):
         None,
     )
 
-    if last_message and ('boxed{' in last_message or '\\boxed{' in last_message or 'The answer is' in last_message):
+    if last_message and (
+        'boxed{' in last_message
+        or '\\boxed{' in last_message
+        or 'The answer is' in last_message
+    ):
         # If the agent has provided a solution in text, let it finish
         return '/exit'
 
@@ -100,10 +104,7 @@ def math500_user_response(state, **kwargs):
 
     # Check if the agent is verifying with code
     has_verified_with_code = any(
-        (
-            'execute_ipython_cell' in msg
-            or 'EXECUTION RESULT' in msg
-        )
+        ('execute_ipython_cell' in msg or 'EXECUTION RESULT' in msg)
         for msg in recent_messages
         if msg
     )
@@ -113,13 +114,11 @@ def math500_user_response(state, **kwargs):
         return 'It looks like you need to install some Python libraries. Use %pip install to install the libraries you need (e.g., %pip install sympy numpy scipy matplotlib).'
     elif not has_verified_with_code and len(recent_messages) >= 1:
         # If the agent hasn't verified with code, strongly encourage it
-        return 'Please verify your reasoning with Python code. Write code to check each step of your thinking - don\'t rely on mental calculations. Install libraries and write verification code for the steps you\'ve already taken.'
+        return "Please verify your reasoning with Python code. Write code to check each step of your thinking - don't rely on mental calculations. Install libraries and write verification code for the steps you've already taken."
     elif not has_used_python and recent_messages:
         # If the agent hasn't used Python in recent messages, strongly encourage it
         return "You need to verify each step with Python code. Don't proceed with your reasoning until you've confirmed your current step with code execution. Use sympy and numpy to verify your mathematical reasoning."
-    elif any(('float' in msg or 'decimal' in msg or '0.' in msg) for msg in recent_messages if msg):
-        # If the agent is using floating-point calculations, remind about rounding errors
-        return "Be careful with floating-point calculations and rounding errors. Use the Fraction class or sympy.Rational for exact arithmetic when possible. Avoid floating-point comparisons for equality, and when using floats, check results with sufficient precision."
+    # Removed the floating-point warning message
 
     # Otherwise, use the standard CodeActAgent response
     return codeact_user_response(state)
@@ -142,11 +141,11 @@ INST_SUFFIXES: dict[str, str] = {
         '- Use the Fraction class or sympy.Rational for exact arithmetic '
         '- Avoid floating-point comparisons for equality '
         '- When using floats, check results with sufficient precision '
-        'Do not proceed to the next step until you\'ve verified your current step with code. '
+        "Do not proceed to the next step until you've verified your current step with code. "
         'If code execution contradicts your reasoning, trust the code and adjust your approach. '
         'When you have the final answer (verified with code), put it in a \\boxed{} notation AND use the "finish" tool with your solution as the parameter.\n'
-        'You\'ll be asked to run a final verification before your solution is accepted.\n'
+        "You'll be asked to run a final verification before your solution is accepted.\n"
         'For example: The final answer is \\boxed{42} and then finish(solution="42")\n'
-        'Remember: Don\'t trust your reasoning without code verification!\n'
+        "Remember: Don't trust your reasoning without code verification!\n"
     )
 }
