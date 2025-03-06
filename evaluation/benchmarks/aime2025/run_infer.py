@@ -9,7 +9,7 @@ from datasets import load_dataset
 
 import openhands.agenthub.codeact_agent.function_calling as codeact_function_calling
 from evaluation.benchmarks.aime2025.agent_controller_patch import patch_agent_controller
-from evaluation.benchmarks.aime2025.single_assistant_message import patch_llm_for_single_assistant_message
+from evaluation.benchmarks.aime2025.single_message_roles import patch_llm_for_single_message_roles
 from evaluation.benchmarks.aime2025.helper import (
     FAKE_RESPONSES,
     INST_SUFFIXES,
@@ -408,12 +408,12 @@ def process_instance(
             and hasattr(state, 'agent')
             and hasattr(state.agent, 'llm')
         ):
-            logger.info('Enabling single assistant message functionality')
+            logger.info('Enabling single message roles functionality')
             
-            # Patch the LLM to use a single growing assistant message
-            patch_llm_for_single_assistant_message(state)
+            # Patch the LLM to use a single system and user message
+            patch_llm_for_single_message_roles(state)
             
-            logger.info('Single assistant message functionality enabled')
+            logger.info('Single message roles functionality enabled')
 
         return state
 
