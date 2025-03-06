@@ -486,13 +486,15 @@ def run_infer(
     dataset = prepare_dataset(dataset, output_file, eval_n_limit, eval_ids, skip_num)
 
     # Run the evaluation
+    # Use mp_workers if use_mp is True, otherwise use 1
+    num_workers = mp_workers if use_mp else 1
+    
     run_evaluation(
         dataset=dataset,
         metadata=metadata,
         process_instance_func=process_instance,
         output_file=output_file,
-        use_mp=use_mp,
-        mp_workers=mp_workers,
+        num_workers=num_workers,
     )
 
 
