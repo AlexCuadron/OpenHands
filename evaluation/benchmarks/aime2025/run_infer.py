@@ -404,33 +404,38 @@ def process_instance(
                 if 'messages' in kwargs:
                     messages = kwargs['messages']
                     
+                    # Find the first user message in the history
+                    first_user_message = None
+                    for event in state.history:
+                        if hasattr(event, 'role') and event.role == 'user' and hasattr(event, 'message'):
+                            first_user_message = event.message
+                            break
+                    
                     # Find all assistant messages in the history
                     assistant_messages = []
                     for event in state.history:
                         if hasattr(event, 'role') and event.role == 'assistant' and hasattr(event, 'message'):
                             assistant_messages.append(event.message)
                     
-                    # If we have assistant messages, add them as prefixes
-                    if assistant_messages:
-                        # Create a new messages list with the original user message
-                        user_message = None
-                        for msg in messages:
-                            if isinstance(msg, dict) and msg.get('role') == 'user':
-                                user_message = msg
-                                break
+                    # If we have the first user message and assistant messages
+                    if first_user_message is not None:
+                        # Create a new messages list with only the first user message
+                        new_messages = [{'role': 'user', 'content': first_user_message}]
                         
-                        if user_message is not None:
-                            # Add all assistant messages as prefixes
-                            for i, msg in enumerate(assistant_messages):
-                                # Add the assistant message as a prefix
-                                messages.append({
-                                    'role': 'assistant',
-                                    'content': msg,
-                                    'prefix': True
-                                })
-                            
-                            # Update the messages in kwargs
-                            kwargs['messages'] = messages
+                        # Add all assistant messages as prefixes
+                        for i, msg in enumerate(assistant_messages):
+                            # Add the assistant message as a prefix
+                            new_messages.append({
+                                'role': 'assistant',
+                                'content': msg,
+                                'prefix': True
+                            })
+                        
+                        # Replace the original messages with our new messages
+                        kwargs['messages'] = new_messages
+                        
+                        # Log the transformation
+                        logger.info(f'Transformed messages: First user message + {len(assistant_messages)} assistant prefixes')
                 
                 # Call the original completion method
                 return original_completion(*args, **kwargs)
