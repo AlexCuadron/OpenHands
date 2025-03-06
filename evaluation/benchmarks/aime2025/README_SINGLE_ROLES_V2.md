@@ -26,7 +26,8 @@ This is achieved through the following components:
 2. `agent_controller_patch.py`: Patches the `AgentController` class to ensure it properly handles our single message approach.
 3. `single_role_messages.py`: Provides functionality to ensure there is only one user message and one assistant message.
 4. `llm_logging_patch.py`: Patches the LLM logging mechanism to ensure that only user and assistant roles are used in the logged messages.
-5. Updates to `run_infer.py`: Modified to use our patched components.
+5. `no_system_message_patch.py`: Patches the LLM to ensure that system messages are never used.
+6. Updates to `run_infer.py`: Modified to use our patched components.
 
 ## Usage
 
@@ -57,5 +58,7 @@ This will run the AIME2025 benchmark with a single instance and verify that the 
 5. **LLM Patching**: We patch the LLM's completion method to transform the messages before sending them to the LLM.
 
 6. **Logging Patching**: We patch the LLM's logging mechanism to ensure that only user and assistant roles are used in the logged messages.
+
+7. **No System Messages**: We patch the LLM to ensure that system messages are never used at any level, including the internal LLM calls.
 
 These changes ensure that the LLM receives a single, coherent set of instructions in one user message and maintains a single, growing assistant message, which should improve the consistency and quality of the responses.

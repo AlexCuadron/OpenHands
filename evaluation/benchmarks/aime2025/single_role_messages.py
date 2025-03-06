@@ -62,9 +62,8 @@ def patch_llm_for_single_role_messages(state: State) -> None:
                 # Create a new messages list with only user and assistant messages
                 new_messages = []
                 
-                # Add system instructions to the user message
-                system_instructions = 'You are OpenHands agent, a helpful AI assistant that can interact with a computer to solve tasks.'
-                user_content = f"{system_instructions}\n\n{first_user_message}"
+                # Just use the first user message as is
+                user_content = first_user_message
                 
                 # Create the user message
                 user_message = {
