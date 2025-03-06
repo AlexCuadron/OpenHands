@@ -66,7 +66,7 @@ COMMAND="export PYTHONPATH=evaluation/benchmarks/aime2025:\$PYTHONPATH && poetry
   --max-iterations 30 \
   --eval-num-workers $NUM_WORKERS \
   --eval-note $EVAL_NOTE \
-  --allowed-tools $ALLOWED_TOOLS \
+  --allowed_tools $ALLOWED_TOOLS \
   $CONFIG_FILE_ARG"
 
 # Print the allowed tools
@@ -75,7 +75,7 @@ echo "ALLOWED_TOOLS: $ALLOWED_TOOLS"
 # Add overthinking threshold if provided
 if [ -n "$OVERTHINKING_THRESHOLD" ]; then
   echo "OVERTHINKING_THRESHOLD: $OVERTHINKING_THRESHOLD"
-  COMMAND="$COMMAND --overthinking-threshold $OVERTHINKING_THRESHOLD"
+  COMMAND="$COMMAND --overthinking_threshold $OVERTHINKING_THRESHOLD"
 fi
 
 if [ -n "$EVAL_LIMIT" ]; then
