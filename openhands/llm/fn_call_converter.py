@@ -1,7 +1,7 @@
-"""Convert function calling messages to non-function calling messages and vice versa.
+"""Convert tool calling messages to non-tool calling messages and vice versa.
 
-This will inject prompts so that models that doesn't support function calling
-can still be used with function calling agents.
+This will inject prompts so that models that don't support tool calling
+can still be used with tool calling agents.
 
 We follow format from: https://docs.litellm.ai/docs/completion/function_call
 """
@@ -20,34 +20,34 @@ from openhands.core.exceptions import (
 
 # Inspired by: https://docs.together.ai/docs/llama-3-function-calling#function-calling-w-llama-31-70b
 SYSTEM_PROMPT_SUFFIX_TEMPLATE = """
-You have access to the following functions:
+You have access to the following tools:
 
 {description}
 
-If you choose to call a function ONLY reply in the following format with NO suffix:
+If you choose to call a tool ONLY reply in the following format with NO suffix:
 
-<function=example_function_name>
+<tool=example_tool_name>
 <parameter=example_parameter_1>value_1</parameter>
 <parameter=example_parameter_2>
 This is the value for the second parameter
 that can span
 multiple lines
 </parameter>
-</function>
+</tool>
 
 <IMPORTANT>
 Reminder:
-- Function calls MUST follow the specified format, start with <function= and end with </function>
+- Tool calls MUST follow the specified format, start with <tool= and end with </tool>
 - Required parameters MUST be specified
-- Only call one function at a time
-- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after.
-- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls
+- Only call one tool at a time
+- You may provide optional reasoning for your tool call in natural language BEFORE the tool call, but NOT after.
+- If there is no tool call available, answer the question like normal with your current knowledge and do not tell the user about tool calls
 </IMPORTANT>
 """
 
-STOP_WORDS = ['</function']
+STOP_WORDS = ['</tool']
 
-# NOTE: we need to make sure this example is always in-sync with the tool interface designed in openhands/agenthub/codeact_agent/function_calling.py
+# NOTE: we need to make sure this example is always in-sync with the tool interface designed in openhands/agenthub/codeact_agent/tool_calling.py
 IN_CONTEXT_LEARNING_EXAMPLE_PREFIX = """
 Here's a running example of how to break down a complex problem into sub-problems and solve each one using tools.
 
@@ -59,13 +59,13 @@ ASSISTANT: I'll solve this problem by breaking it down into sub-problems and usi
 
 First, I need to install the necessary libraries:
 
-<function=execute_ipython_cell>
+<tool=execute_ipython_cell>
 <parameter=code>
 # Install necessary libraries
 import itertools
 import numpy as np
 </parameter>
-</function>
+</tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 [Jupyter current working directory: /workspace]
@@ -80,7 +80,7 @@ Sub-problem 4: Count all valid pairs by checking each possible (a,b) combination
 
 Let me start with sub-problem 1:
 
-<function=execute_ipython_cell>
+<tool=execute_ipython_cell>
 <parameter=code>
 # Sub-problem 1: Understand the constraints on a and b
 
@@ -101,7 +101,7 @@ print(f"Possible values for a: {a_min} to {a_max}")
 print(f"For each a, possible values for b: {b_min_formula} to {b_max}")
 print(f"Total possible pairs before checking AP constraint: {total_pairs}")
 </parameter>
-</function>
+</tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 Constraints: 5 < a < b < 30
@@ -113,7 +113,7 @@ Total possible pairs before checking AP constraint: 276
 
 ASSISTANT: Now I'll tackle sub-problem 2 - defining a function to check if four numbers form an arithmetic progression:
 
-<function=execute_ipython_cell>
+<tool=execute_ipython_cell>
 <parameter=code>
 # Sub-problem 2: Define a function to check if four numbers form an arithmetic progression
 
@@ -147,7 +147,7 @@ for nums, expected in test_cases:
     result = is_arithmetic_progression(nums)
     print(f"{nums}: {'is AP' if result else 'not AP'} (Expected: {'AP' if expected else 'not AP'})")
 </parameter>
-</function>
+</tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 [3, 4, 5, 6]: is AP (Expected: AP)
@@ -160,7 +160,7 @@ USER: EXECUTION RESULT of [execute_ipython_cell]:
 
 ASSISTANT: Now for sub-problem 3, I'll identify some specific invalid pairs (a,b) that create arithmetic progressions:
 
-<function=execute_ipython_cell>
+<tool=execute_ipython_cell>
 <parameter=code>
 # Sub-problem 3: Identify specific invalid pairs (a,b) that create arithmetic progressions
 
@@ -189,7 +189,7 @@ for a, b in test_pairs:
     ap_info = f" - AP found: {ap_found}" if invalid else ""
     print(f"Pair (a={a}, b={b}): {status}{ap_info}")
 </parameter>
-</function>
+</tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 Pair (a=6, b=7): Invalid - AP found: (3, 4, 5, 6)
@@ -202,7 +202,7 @@ Pair (a=8, b=9): Valid
 
 ASSISTANT: Now I'll solve sub-problem 4 by counting all valid pairs. Since there are 276 possible pairs to check, I'll implement an efficient algorithm:
 
-<function=execute_ipython_cell>
+<tool=execute_ipython_cell>
 <parameter=code>
 # Sub-problem 4: Count all valid pairs by checking each possible (a,b) combination
 
@@ -240,7 +240,7 @@ print(f"Valid pairs (no AP): {valid_pairs}")
 # Verify our total matches our earlier calculation
 print(f"Verification: Total matches earlier calculation: {total_pairs == 276}")
 </parameter>
-</function>
+</tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 Total possible pairs: 276
@@ -252,7 +252,7 @@ Verification: Total matches earlier calculation: True
 
 ASSISTANT: Let me verify the result by checking a few more specific cases to make sure our algorithm is correct:
 
-<function=execute_ipython_cell>
+<tool=execute_ipython_cell>
 <parameter=code>
 # Verify our result with additional test cases
 
@@ -290,7 +290,7 @@ for a, count in valid_by_a.items():
 # Verify the total again
 print(f"\nSum of valid pairs across all a values: {sum(valid_by_a.values())}")
 </parameter>
-</function>
+</tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 Pair (a=8, b=10): Valid
@@ -328,7 +328,7 @@ Sum of valid pairs across all a values: 228
 
 ASSISTANT: Now I'll combine the results from all sub-problems to determine the final answer:
 
-<function=execute_ipython_cell>
+<tool=execute_ipython_cell>
 <parameter=code>
 # Combining results from all sub-problems
 
@@ -348,7 +348,7 @@ print("- For a=7, we have the maximum number of valid pairs (21)")
 
 print("\nTherefore, the answer is 228.")
 </parameter>
-</function>
+</tool>
 
 USER: EXECUTION RESULT of [execute_ipython_cell]:
 Summary of findings:
@@ -382,9 +382,9 @@ ASSISTANT: I've solved this problem by breaking it down into sub-problems and us
 
 The answer is 228.
 
-<function=finish>
+<tool=finish>
 <parameter=solution>228</parameter>
-</function>
+</tool>
 
 --------------------- END OF EXAMPLE ---------------------
 
@@ -396,12 +396,12 @@ Do NOT assume the environment is the same as in the example above.
 IN_CONTEXT_LEARNING_EXAMPLE_SUFFIX = """
 --------------------- END OF NEW TASK DESCRIPTION ---------------------
 
-PLEASE follow the format strictly! PLEASE EMIT ONE AND ONLY ONE FUNCTION CALL PER MESSAGE.
+PLEASE follow the format strictly! PLEASE EMIT ONE AND ONLY ONE TOOL CALL PER MESSAGE.
 """
 
-# Regex patterns for function call parsing
-FN_REGEX_PATTERN = r'<function=([^>]+)>\n(.*?)</function>'
-FN_PARAM_REGEX_PATTERN = r'<parameter=([^>]+)>(.*?)</parameter>'
+# Regex patterns for tool call parsing
+TOOL_REGEX_PATTERN = r'<tool=([^>]+)>\n(.*?)</tool>'
+TOOL_PARAM_REGEX_PATTERN = r'<parameter=([^>]+)>(.*?)</parameter>'
 
 # Add new regex pattern for tool execution results
 TOOL_RESULT_REGEX_PATTERN = r'EXECUTION RESULT of \[(.*?)\]:\n(.*)'
@@ -418,7 +418,7 @@ def convert_tool_call_to_string(tool_call: dict) -> str:
     if tool_call['type'] != 'function':
         raise FunctionCallConversionError("Tool call type must be 'function'.")
 
-    ret = f"<function={tool_call['function']['name']}>\n"
+    ret = f"<tool={tool_call['function']['name']}>\n"
     try:
         args = json.loads(tool_call['function']['arguments'])
     except json.JSONDecodeError as e:
@@ -434,7 +434,7 @@ def convert_tool_call_to_string(tool_call: dict) -> str:
         if is_multiline:
             ret += '\n'
         ret += '</parameter>\n'
-    ret += '</function>'
+    ret += '</tool>'
     return ret
 
 
@@ -740,11 +740,11 @@ def _extract_and_validate_params(
 
 def _fix_stopword(content: str) -> str:
     """Fix the issue when some LLM would NOT return the stopword."""
-    if '<function=' in content and content.count('<function=') == 1:
+    if '<tool=' in content and content.count('<tool=') == 1:
         if content.endswith('</'):
             content = content.rstrip() + 'function>'
         else:
-            content = content + '\n</function>'
+            content = content + '\n</tool>'
     return content
 
 
@@ -857,18 +857,18 @@ def convert_non_fncall_messages_to_fncall_messages(
         elif role == 'assistant':
             if isinstance(content, str):
                 content = _fix_stopword(content)
-                fn_match = re.search(FN_REGEX_PATTERN, content, re.DOTALL)
+                fn_match = re.search(TOOL_REGEX_PATTERN, content, re.DOTALL)
             elif isinstance(content, list):
                 if content and content[-1]['type'] == 'text':
                     content[-1]['text'] = _fix_stopword(content[-1]['text'])
                     fn_match = re.search(
-                        FN_REGEX_PATTERN, content[-1]['text'], re.DOTALL
+                        TOOL_REGEX_PATTERN, content[-1]['text'], re.DOTALL
                     )
                 else:
                     fn_match = None
                 fn_match_exists = any(
                     item.get('type') == 'text'
-                    and re.search(FN_REGEX_PATTERN, item['text'], re.DOTALL)
+                    and re.search(TOOL_REGEX_PATTERN, item['text'], re.DOTALL)
                     for item in content
                 )
                 if fn_match_exists and not fn_match:
@@ -899,7 +899,7 @@ def convert_non_fncall_messages_to_fncall_messages(
                     )
 
                 # Parse parameters
-                param_matches = re.finditer(FN_PARAM_REGEX_PATTERN, fn_body, re.DOTALL)
+                param_matches = re.finditer(TOOL_PARAM_REGEX_PATTERN, fn_body, re.DOTALL)
                 params = _extract_and_validate_params(
                     matching_tool, param_matches, fn_name
                 )
@@ -918,10 +918,10 @@ def convert_non_fncall_messages_to_fncall_messages(
                 if isinstance(content, list):
                     assert content and content[-1]['type'] == 'text'
                     content[-1]['text'] = (
-                        content[-1]['text'].split('<function=')[0].strip()
+                        content[-1]['text'].split('<tool=')[0].strip()
                     )
                 elif isinstance(content, str):
-                    content = content.split('<function=')[0].strip()
+                    content = content.split('<tool=')[0].strip()
                 else:
                     raise FunctionCallConversionError(
                         f'Unexpected content type {type(content)}. Expected str or list. Content: {content}'
