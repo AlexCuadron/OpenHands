@@ -5,6 +5,7 @@ that ensures all instructions are sent in a single user message.
 
 from openhands.controller.agent_controller import AgentController
 from openhands.core.logger import openhands_logger as logger
+from openhands.events import EventSource
 from openhands.events.action import MessageAction
 from openhands.events.event import Event
 
@@ -23,18 +24,18 @@ def patch_agent_controller():
         Process an event, ensuring all instructions are sent in a single user message.
         """
         # If this is a MessageAction from the user, ensure it's the only one
-        if isinstance(event, MessageAction) and event.role == 'user':
+        if isinstance(event, MessageAction) and event.source == EventSource.USER:
             # Get the initial user message (the problem statement)
             initial_user_message = None
             for e in self.state.history:
-                if isinstance(e, MessageAction) and e.role == 'user':
+                if isinstance(e, MessageAction) and e.source == EventSource.USER:
                     initial_user_message = e
                     break
             
             # If we have an initial user message and this is a different message
-            if initial_user_message and initial_user_message.message != event.message:
+            if initial_user_message and initial_user_message.content != event.content:
                 # This is a follow-up message (e.g., a reminder to use Python)
-                logger.info(f'Intercepted follow-up user message: "{event.message[:50]}..."')
+                logger.info(f'Intercepted follow-up user message: "{event.content[:50]}..."')
                 logger.info('Ignoring follow-up user message to maintain single message approach')
                 return
             
@@ -42,7 +43,7 @@ def patch_agent_controller():
             self.state.history = [
                 e
                 for e in self.state.history
-                if not (isinstance(e, MessageAction) and e.role == 'user')
+                if not (isinstance(e, MessageAction) and e.source == EventSource.USER)
             ]
             
             # Log that we're using a single user message

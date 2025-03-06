@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from openhands.controller.state.state import State
 from openhands.core.logger import openhands_logger as logger
+from openhands.events import EventSource
 from openhands.events.action import MessageAction
 from openhands.events.event import Event
 from openhands.events.observation import Observation
@@ -36,29 +37,21 @@ def patch_llm_for_single_assistant_message(state: State) -> None:
             # Find the first user message in the history
             first_user_message = None
             for event in state.history:
-                if (
-                    hasattr(event, 'role')
-                    and event.role == 'user'
-                    and hasattr(event, 'message')
-                ):
-                    first_user_message = event.message
+                if isinstance(event, MessageAction) and event.source == EventSource.USER:
+                    first_user_message = event.content
                     break
             
             # Collect all assistant messages and tool observations
             assistant_content = []
             for i, event in enumerate(state.history):
                 # Add assistant messages
-                if (
-                    hasattr(event, 'role')
-                    and event.role == 'assistant'
-                    and hasattr(event, 'message')
-                ):
-                    assistant_content.append(event.message)
+                if isinstance(event, MessageAction) and event.source == EventSource.AGENT:
+                    assistant_content.append(event.content)
                 
                 # Add tool observations (results)
                 elif isinstance(event, Observation):
                     # Only add observations that follow assistant messages
-                    if i > 0 and hasattr(state.history[i-1], 'role') and state.history[i-1].role == 'assistant':
+                    if i > 0 and isinstance(state.history[i-1], MessageAction) and state.history[i-1].source == EventSource.AGENT:
                         # Format the observation as a tool result
                         observation_content = f"\n\nTOOL RESULT:\n{event.content}\n"
                         assistant_content.append(observation_content)
@@ -108,17 +101,13 @@ def get_combined_assistant_message(state: State) -> str:
     assistant_content = []
     for i, event in enumerate(state.history):
         # Add assistant messages
-        if (
-            hasattr(event, 'role')
-            and event.role == 'assistant'
-            and hasattr(event, 'message')
-        ):
-            assistant_content.append(event.message)
+        if isinstance(event, MessageAction) and event.source == EventSource.AGENT:
+            assistant_content.append(event.content)
         
         # Add tool observations (results)
         elif isinstance(event, Observation):
             # Only add observations that follow assistant messages
-            if i > 0 and hasattr(state.history[i-1], 'role') and state.history[i-1].role == 'assistant':
+            if i > 0 and isinstance(state.history[i-1], MessageAction) and state.history[i-1].source == EventSource.AGENT:
                 # Format the observation as a tool result
                 observation_content = f"\n\nTOOL RESULT:\n{event.content}\n"
                 assistant_content.append(observation_content)
