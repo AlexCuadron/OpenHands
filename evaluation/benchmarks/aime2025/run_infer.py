@@ -14,6 +14,8 @@ from evaluation.benchmarks.aime2025.helper import (
     INSTRUCTIONS_ADDENDUM,
     USE_PREFIX_FOR_ASSISTANT,
 )
+from evaluation.benchmarks.aime2025.single_message_prompt import run_controller_single_message
+from evaluation.benchmarks.aime2025.agent_controller_patch import patch_agent_controller
 from evaluation.benchmarks.aime2025.thinking_agent import (
     analyze_overthinking,
     get_thinking_agent_llm,
@@ -364,6 +366,10 @@ def process_instance(
     runtime: Runtime = create_runtime(config)
     call_async_from_sync(runtime.connect)
 
+    # Apply the patch to ensure single user message
+    patch_agent_controller()
+    logger.info("Applied AgentController patch for single user message")
+
     # Get the override_tools from metadata details if it exists
     override_tools = (
         metadata.details.get('override_tools', None) if metadata.details else None
@@ -371,8 +377,8 @@ def process_instance(
 
     # Define a custom run_controller function that overrides the tools if needed
     async def custom_run_controller():
-        # Run the controller normally
-        state = await run_controller(
+        # Run the controller with a single user message
+        state = await run_controller_single_message(
             config=config,
             initial_user_action=MessageAction(content=instruction),
             runtime=runtime,
