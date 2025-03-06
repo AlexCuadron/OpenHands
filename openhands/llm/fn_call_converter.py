@@ -45,7 +45,10 @@ Reminder:
 </IMPORTANT>
 """
 
-STOP_WORDS = ['</tool', '</parameter']
+STOP_WORDS = [
+    '</parameter>\n',  # This is what's actually used in the code (line 446)
+    '</tool>'          # This is what's actually used in the code (line 447)
+]
 
 # NOTE: we need to make sure this example is always in-sync with the tool interface designed in openhands/agenthub/codeact_agent/tool_calling.py
 IN_CONTEXT_LEARNING_EXAMPLE_PREFIX = """
@@ -402,6 +405,9 @@ PLEASE follow the format strictly! PLEASE EMIT ONE AND ONLY ONE TOOL CALL PER ME
 # Regex patterns for tool call parsing
 TOOL_REGEX_PATTERN = r'<tool=([^>]+)>\n(.*?)</tool>'
 TOOL_PARAM_REGEX_PATTERN = r'<parameter=([^>]+)>(.*?)</parameter>'
+
+# Make sure these patterns match our stop words
+# The regex patterns use '</tool>' and '</parameter>' as closing tags
 
 # Add new regex pattern for tool execution results
 TOOL_RESULT_REGEX_PATTERN = r'EXECUTION RESULT of \[(.*?)\]:\n(.*)'
