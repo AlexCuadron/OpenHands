@@ -56,19 +56,26 @@ async def run_controller_single_message(
     if fake_user_response_fn:
         runtime.event_stream.fake_user_response_fn = single_message_fake_user_response
     
-    # Add the initial user action to the event stream
-    runtime.event_stream.add_event(initial_user_action, EventSource.USER)
+    # Process the initial user action
+    # Use the on_event method to process the event
+    controller.on_event(initial_user_action)
     
     # Set up event handling to prevent additional user messages
+    event_stream = runtime.event_stream
+    
+    # Define a flag to track if we need to finish
+    finish_requested = False
+    
     def on_event(event: Event):
+        nonlocal finish_requested
         if isinstance(event, AgentStateChangedObservation):
             if event.agent_state == AgentState.AWAITING_USER_INPUT:
                 # If the agent is waiting for user input, we'll exit instead
                 logger.info('Agent is waiting for user input, but we are in single message mode. Exiting.')
-                asyncio.create_task(controller.set_agent_state_to(AgentState.FINISHED))
+                finish_requested = True
     
     # Subscribe to events
-    runtime.event_stream.subscribe(EventStreamSubscriber.MAIN, on_event, runtime.event_stream.sid)
+    event_stream.subscribe(EventStreamSubscriber.MAIN, on_event, event_stream.sid)
     
     # Define the end states
     end_states = [
@@ -79,8 +86,13 @@ async def run_controller_single_message(
         AgentState.STOPPED,
     ]
     
-    # Run the agent until it reaches an end state
-    await run_agent_until_done(controller, runtime, end_states)
+    # Run the agent until it reaches an end state or finish is requested
+    while controller.state.agent_state not in end_states:
+        if finish_requested:
+            # Set the agent state to FINISHED synchronously
+            asyncio.run(controller.set_agent_state_to(AgentState.FINISHED))
+            break
+        await asyncio.sleep(1)
     
     # Return the final state
     return controller.state
