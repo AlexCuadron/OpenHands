@@ -4,13 +4,14 @@ that ensures all instructions are sent in a single user message.
 """
 
 import asyncio
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 
 from openhands.controller.agent_controller import AgentController
 from openhands.controller.state.state import State
 from openhands.core.config import AppConfig
 from openhands.core.logger import openhands_logger as logger
 from openhands.core.schema import AgentState
+from openhands.core.setup import create_agent, create_controller
 from openhands.events import EventSource, EventStreamSubscriber
 from openhands.events.action import MessageAction
 from openhands.events.event import Event
@@ -39,19 +40,23 @@ async def run_controller_single_message(
     Returns:
         The final state of the agent controller
     """
-    # Create the agent controller
-    controller = AgentController(
-        config=config,
+    # Create the agent
+    agent = create_agent(config)
+    
+    # Create the controller using the create_controller function
+    controller, initial_state = create_controller(
+        agent=agent,
         runtime=runtime,
-        # We'll override the fake_user_response_fn to prevent additional user messages
-        fake_user_response_fn=single_message_fake_user_response,
+        config=config,
+        headless_mode=True,
     )
     
-    # Initialize the controller
-    await controller.initialize()
+    # Set the fake user response function
+    if fake_user_response_fn:
+        runtime.event_stream.fake_user_response_fn = single_message_fake_user_response
     
     # Process the initial user action
-    # Use the on_event method instead of process_event
+    # Use the on_event method to process the event
     controller.on_event(initial_user_action)
     
     # Set up event handling to prevent additional user messages
