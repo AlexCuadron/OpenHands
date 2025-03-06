@@ -459,6 +459,9 @@ def run_infer(
     """
     # Load the dataset
     dataset = load_dataset('yentinglin/aime_2025', split='train').to_pandas()
+    
+    # Add instance_id column using the 'id' column
+    dataset['instance_id'] = dataset['id'].astype(str)
 
     # Create the metadata
     llm_config = get_llm_config_arg(llm_config_name)
