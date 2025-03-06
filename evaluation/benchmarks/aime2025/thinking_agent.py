@@ -69,8 +69,17 @@ def get_thinking_agent_llm() -> LLM:
     config_path = os.path.join(
         os.path.dirname(__file__), 'thinking_agent_config.toml'
     )
-    config = load_from_toml(config_path)
-    llm_config = LLMConfig(**config['llm'])
+    with open(config_path, 'r') as f:
+        import toml
+        config_data = toml.load(f)
+    
+    # Create LLMConfig from the config data
+    llm_config = LLMConfig(
+        model=config_data['llm']['model'],
+        temperature=config_data['llm']['temperature'],
+        max_output_tokens=config_data['llm']['max_tokens'],
+        custom_llm_provider="together",
+    )
     return LLM(llm_config)
 
 
