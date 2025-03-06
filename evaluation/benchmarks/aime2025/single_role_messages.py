@@ -84,8 +84,19 @@ def patch_llm_for_single_role_messages(state: State) -> None:
                 # Replace the original messages with our new messages
                 kwargs['messages'] = new_messages
                 
+                # Add </parameter> as a stop word
+                if 'stop' not in kwargs:
+                    kwargs['stop'] = []
+                elif isinstance(kwargs['stop'], str):
+                    kwargs['stop'] = [kwargs['stop']]
+                
+                # Add </parameter> to the stop words if it's not already there
+                if '</parameter>' not in kwargs['stop']:
+                    kwargs['stop'].append('</parameter>')
+                
                 # Log the transformation
                 logger.info(f'Transformed messages: Single user message + Single assistant message with prefix=true')
+                logger.info(f'Added </parameter> as a stop word')
         
         # Call the original completion method
         return original_completion(*args, **kwargs)
