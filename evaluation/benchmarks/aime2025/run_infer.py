@@ -2,23 +2,24 @@ import asyncio
 import copy
 import os
 import re
-from typing import Optional, Dict, List, Any
+from typing import Any, Dict, List
 
 import pandas as pd
 from datasets import load_dataset
 
 import openhands.agenthub.codeact_agent.function_calling as codeact_function_calling
+from evaluation.benchmarks.aime2025.agent_controller_patch import patch_agent_controller
 from evaluation.benchmarks.aime2025.helper import (
     FAKE_RESPONSES,
     INST_SUFFIXES,
     INSTRUCTIONS_ADDENDUM,
     USE_PREFIX_FOR_ASSISTANT,
 )
-from evaluation.benchmarks.aime2025.single_message_prompt import run_controller_single_message
-from evaluation.benchmarks.aime2025.agent_controller_patch import patch_agent_controller
+from evaluation.benchmarks.aime2025.single_message_prompt import (
+    run_controller_single_message,
+)
 from evaluation.benchmarks.aime2025.thinking_agent import (
     analyze_overthinking,
-    get_thinking_agent_llm,
     should_discard_solution,
 )
 from evaluation.utils.shared import (
@@ -40,7 +41,7 @@ from openhands.core.config import (
     load_from_toml,
 )
 from openhands.core.logger import openhands_logger as logger
-from openhands.core.main import create_runtime, run_controller
+from openhands.core.main import create_runtime
 from openhands.events.action import AgentFinishAction, MessageAction
 from openhands.runtime.base import Runtime
 from openhands.utils.async_utils import call_async_from_sync
@@ -75,10 +76,10 @@ def get_config(
     llm_config = update_llm_config_for_completions_logging(
         metadata.llm_config, metadata.eval_output_dir, str(instance.instance_id)
     )
-    
+
     # Set temperature to 0.6 as recommended for mathematical problems
     llm_config.temperature = 0.6
-    logger.info(f'Set temperature to 0.6 for AIME2025 benchmark')
+    logger.info('Set temperature to 0.6 for AIME2025 benchmark')
 
     # Disable native tool calling for Together.ai models
     if llm_config and (
@@ -291,7 +292,10 @@ def extract_answer(history: List[Dict], ground_truth: str) -> str:
 
 
 def evaluate_answer(
-    predicted_answer: str, ground_truth: str, history: List[Dict], metadata: EvalMetadata
+    predicted_answer: str,
+    ground_truth: str,
+    history: List[Dict],
+    metadata: EvalMetadata,
 ) -> Dict[str, Any]:
     """
     Evaluate the predicted answer against the ground truth.
@@ -368,7 +372,7 @@ def process_instance(
 
     # Apply the patch to ensure single user message
     patch_agent_controller()
-    logger.info("Applied AgentController patch for single user message")
+    logger.info('Applied AgentController patch for single user message')
 
     # Get the override_tools from metadata details if it exists
     override_tools = (
@@ -396,59 +400,71 @@ def process_instance(
             logger.info(
                 f'Overriding agent tools with: {[tool.function.name for tool in override_tools]}'
             )
-        
+
         # If prefix functionality is enabled, modify the agent's LLM to use prefixes
-        if USE_PREFIX_FOR_ASSISTANT and hasattr(state, 'agent') and hasattr(state.agent, 'llm'):
+        if (
+            USE_PREFIX_FOR_ASSISTANT
+            and hasattr(state, 'agent')
+            and hasattr(state.agent, 'llm')
+        ):
             logger.info('Enabling prefix functionality for assistant messages')
-            
+
             # Store the original completion method
             original_completion = state.agent.llm.completion
-            
+
             # Create a wrapper function that adds the prefix parameter to assistant messages
             def completion_with_prefix(*args, **kwargs):
                 # Get the messages from kwargs
                 if 'messages' in kwargs:
-                    messages = kwargs['messages']
-                    
+                    kwargs_messages = kwargs['messages']
+
                     # Find the first user message in the history
                     first_user_message = None
                     for event in state.history:
-                        if hasattr(event, 'role') and event.role == 'user' and hasattr(event, 'message'):
+                        if (
+                            hasattr(event, 'role')
+                            and event.role == 'user'
+                            and hasattr(event, 'message')
+                        ):
                             first_user_message = event.message
                             break
-                    
+
                     # Find all assistant messages in the history
                     assistant_messages = []
                     for event in state.history:
-                        if hasattr(event, 'role') and event.role == 'assistant' and hasattr(event, 'message'):
+                        if (
+                            hasattr(event, 'role')
+                            and event.role == 'assistant'
+                            and hasattr(event, 'message')
+                        ):
                             assistant_messages.append(event.message)
-                    
+
                     # If we have the first user message and assistant messages
                     if first_user_message is not None:
                         # Create a new messages list with only the first user message
                         new_messages = [{'role': 'user', 'content': first_user_message}]
-                        
+
                         # Add all assistant messages as prefixes
                         for i, msg in enumerate(assistant_messages):
                             # Add the assistant message as a prefix
-                            new_messages.append({
-                                'role': 'assistant',
-                                'content': msg,
-                                'prefix': True
-                            })
-                        
+                            new_messages.append(
+                                {'role': 'assistant', 'content': msg, 'prefix': True}
+                            )
+
                         # Replace the original messages with our new messages
                         kwargs['messages'] = new_messages
-                        
+
                         # Log the transformation
-                        logger.info(f'Transformed messages: First user message + {len(assistant_messages)} assistant prefixes')
-                
+                        logger.info(
+                            f'Transformed messages: First user message + {len(assistant_messages)} assistant prefixes'
+                        )
+
                 # Call the original completion method
                 return original_completion(*args, **kwargs)
-            
+
             # Replace the agent's completion method with our wrapper
             state.agent.llm._completion = completion_with_prefix
-            
+
             logger.info('Prefix functionality enabled for assistant messages')
 
         return state
@@ -490,7 +506,9 @@ def process_instance(
         if isinstance(outputs, dict) and 'solution' in outputs and outputs['solution']:
             # The outputs dictionary has a solution key with a non-empty value
             possible_answers.append(outputs['solution'])
-            logger.info(f'Found solution in finish action outputs: {outputs["solution"]}')
+            logger.info(
+                f'Found solution in finish action outputs: {outputs["solution"]}'
+            )
 
     # Method 3: Extract from finish action params dictionary
     if finish_action and hasattr(finish_action, 'params'):
@@ -504,7 +522,10 @@ def process_instance(
     last_messages = [
         event.message
         for event in reversed(state.history)
-        if hasattr(event, 'message') and event.message and hasattr(event, 'role') and event.role == 'assistant'
+        if hasattr(event, 'message')
+        and event.message
+        and hasattr(event, 'role')
+        and event.role == 'assistant'
     ][:3]  # Look at the last 3 assistant messages
 
     for message in last_messages:
@@ -527,7 +548,9 @@ def process_instance(
     # If we found any possible answers, use the first one
     if possible_answers:
         # Normalize the answers (remove non-numeric characters)
-        normalized_answers = [re.sub(r'[^0-9-]', '', str(ans)) for ans in possible_answers]
+        normalized_answers = [
+            re.sub(r'[^0-9-]', '', str(ans)) for ans in possible_answers
+        ]
         logger.info(f'Normalized possible answers: {normalized_answers}')
 
         # For AIME problems, prefer answers that are just numbers
@@ -545,54 +568,67 @@ def process_instance(
     # Normalize answers for comparison
     predicted_norm = predicted_answer if predicted_answer is not None else ''
     reference_norm = instance.answer if instance.answer is not None else ''
-    
+
     # Check if the predicted answer matches the reference answer
     is_correct = predicted_norm == reference_norm
-    
+
     # Create the test result
     test_result = {
         'predicted_answer': predicted_norm,
         'reference_answer': reference_norm,
         'is_correct': is_correct,
     }
-    
+
     # Check if we should discard the solution due to overthinking
-    if hasattr(metadata, 'overthinking_threshold') and metadata.overthinking_threshold is not None:
+    if (
+        hasattr(metadata, 'overthinking_threshold')
+        and metadata.overthinking_threshold is not None
+    ):
         try:
             # Get the overthinking threshold from metadata
             overthinking_threshold = int(metadata.overthinking_threshold)
-            
+
             # Analyze the solution for overthinking
             overthinking_score, analysis = analyze_overthinking(state.history)
-            
+
             # Save the analysis to a file
-            overthinking_dir = os.path.join(metadata.eval_output_dir, 'overthinking_analysis')
+            overthinking_dir = os.path.join(
+                metadata.eval_output_dir, 'overthinking_analysis'
+            )
             os.makedirs(overthinking_dir, exist_ok=True)
-            
-            analysis_file = os.path.join(overthinking_dir, f'instance_{instance.instance_id}.txt')
+
+            analysis_file = os.path.join(
+                overthinking_dir, f'instance_{instance.instance_id}.txt'
+            )
             with open(analysis_file, 'w') as f:
-                f.write(f"Overthinking Score: {overthinking_score}/10\n\n")
+                f.write(f'Overthinking Score: {overthinking_score}/10\n\n')
                 f.write(analysis)
-            
+
             # Add overthinking analysis to test_result
             test_result['overthinking_score'] = overthinking_score
             test_result['overthinking_analysis'] = analysis
-            
-            logger.info(f"Overthinking analysis completed. Score: {overthinking_score}/10")
-            logger.info(f"Overthinking analysis files saved to: {overthinking_dir}")
-            
+
+            logger.info(
+                f'Overthinking analysis completed. Score: {overthinking_score}/10'
+            )
+            logger.info(f'Overthinking analysis files saved to: {overthinking_dir}')
+
             # Check if the solution should be discarded based on the overthinking score
             if should_discard_solution(overthinking_score, int(overthinking_threshold)):
-                logger.warning(f"Solution discarded due to high overthinking score: {overthinking_score} > {overthinking_threshold}")
-                
+                logger.warning(
+                    f'Solution discarded due to high overthinking score: {overthinking_score} > {overthinking_threshold}'
+                )
+
                 # Instead of just marking as incorrect, raise an exception to trigger a retry
-                raise Exception(f"Overthinking detected with score {overthinking_score} > threshold {overthinking_threshold}. Retrying...")
+                raise Exception(
+                    f'Overthinking detected with score {overthinking_score} > threshold {overthinking_threshold}. Retrying...'
+                )
             else:
                 test_result['solution_discarded'] = False
         except Exception as e:
-            logger.error(f"Error during overthinking analysis: {e}")
+            logger.error(f'Error during overthinking analysis: {e}')
             test_result['overthinking_error'] = str(e)
-    
+
     # Save the output
     output = EvalOutput(
         instance_id=str(instance.instance_id),
@@ -619,11 +655,11 @@ def load_aime2025_dataset() -> pd.DataFrame:
         pd.DataFrame: The AIME2025 dataset
     """
     # Load the dataset from Hugging Face
-    dataset = load_dataset("yentinglin/aime_2025")
-    
+    dataset = load_dataset('yentinglin/aime_2025')
+
     # Convert to pandas DataFrame
     df = pd.DataFrame(dataset['train'])
-    
+
     return df
 
 
@@ -638,7 +674,7 @@ def parse_aime2025_arguments():
         default='all',
         help='Comma-separated list of allowed tools for the agent. Options: all, ipython_only, bash_only, no_editor',
     )
-    
+
     # Add custom argument for overthinking threshold
     parser.add_argument(
         '--overthinking-threshold',
@@ -646,7 +682,7 @@ def parse_aime2025_arguments():
         default=None,
         help='Threshold for determining overthinking (default: None)',
     )
-    
+
     return parser.parse_args()
 
 
@@ -655,7 +691,7 @@ if __name__ == '__main__':
 
     # Load the AIME2025 dataset
     df = load_aime2025_dataset()
-    
+
     # Add instance_id if not present
     if 'instance_id' not in df.columns:
         df['instance_id'] = df['id'].apply(lambda x: f'aime2025_{x}')
@@ -672,7 +708,7 @@ if __name__ == '__main__':
 
     # Create agent details dictionary
     agent_details = {}
-    
+
     # Create metadata for evaluation
     metadata = make_metadata(
         llm_config,
@@ -683,26 +719,26 @@ if __name__ == '__main__':
         args.eval_output_dir,
         details=agent_details,
     )
-    
+
     # Add the allowed_tools parameter to the metadata details
     if metadata.details is None:
         metadata.details = {}
     metadata.details['allowed_tools'] = args.allowed_tools
-    
+
     # Add the overthinking threshold if provided
     if args.overthinking_threshold is not None:
         metadata.overthinking_threshold = args.overthinking_threshold
         metadata.details['overthinking_threshold'] = args.overthinking_threshold
         logger.info(f'\nUsing overthinking threshold: {args.overthinking_threshold}\n')
-    
+
     output_file = os.path.join(metadata.eval_output_dir, 'output.jsonl')
-    
+
     # Parse dataset IDs if provided
     eval_ids = None
     if args.eval_ids:
         eval_ids = str(args.eval_ids).split(',')
         logger.info(f'\nUsing specific dataset IDs: {eval_ids}\n')
-    
+
     # Prepare the dataset for evaluation
     instances = prepare_dataset(
         df,
@@ -710,7 +746,7 @@ if __name__ == '__main__':
         args.eval_n_limit,
         eval_ids=eval_ids,
     )
-    
+
     # Run the evaluation
     run_evaluation(
         instances,
@@ -719,5 +755,3 @@ if __name__ == '__main__':
         args.eval_num_workers,
         process_instance,
     )
-
-
