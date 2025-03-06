@@ -461,16 +461,21 @@ def run_infer(
     dataset = load_dataset('yentinglin/aime_2025', split='train').to_pandas()
 
     # Create the metadata
-    llm_config = get_llm_config_arg(llm_config_name, llm_config_hash)
+    llm_config = get_llm_config_arg(llm_config_name)
+    # Add overthinking_threshold to details if provided
+    details_dict = {'allowed_tools': allowed_tools}
+    if overthinking_threshold is not None:
+        details_dict['overthinking_threshold'] = overthinking_threshold
+        
     metadata = make_metadata(
         agent_class=agent_class,
         llm_config=llm_config,
         max_iterations=30,
-        dataset='AIME2025',
+        dataset_name='AIME2025',
         data_split=data_split,
-        details={'allowed_tools': allowed_tools},
-        overthinking_threshold=overthinking_threshold,
-        output_dir=output_dir,
+        details=details_dict,
+        eval_output_dir=output_dir or 'evaluation/evaluation_outputs/outputs',
+        eval_note=llm_config_hash,
     )
 
     # Prepare the dataset
