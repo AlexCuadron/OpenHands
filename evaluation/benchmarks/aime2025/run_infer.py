@@ -9,6 +9,7 @@ from datasets import load_dataset
 
 import openhands.agenthub.codeact_agent.function_calling as codeact_function_calling
 from evaluation.benchmarks.aime2025.agent_controller_patch import patch_agent_controller
+from evaluation.benchmarks.aime2025.single_assistant_message import patch_llm_for_single_assistant_message
 from evaluation.benchmarks.aime2025.helper import (
     FAKE_RESPONSES,
     INST_SUFFIXES,
@@ -401,71 +402,18 @@ def process_instance(
                 f'Overriding agent tools with: {[tool.function.name for tool in override_tools]}'
             )
 
-        # If prefix functionality is enabled, modify the agent's LLM to use prefixes
+        # If prefix functionality is enabled, modify the agent's LLM to use a single growing assistant message
         if (
             USE_PREFIX_FOR_ASSISTANT
             and hasattr(state, 'agent')
             and hasattr(state.agent, 'llm')
         ):
-            logger.info('Enabling prefix functionality for assistant messages')
-
-            # Store the original completion method
-            original_completion = state.agent.llm.completion
-
-            # Create a wrapper function that adds the prefix parameter to assistant messages
-            def completion_with_prefix(*args, **kwargs):
-                # Get the messages from kwargs
-                if 'messages' in kwargs:
-                    kwargs_messages = kwargs['messages']
-
-                    # Find the first user message in the history
-                    first_user_message = None
-                    for event in state.history:
-                        if (
-                            hasattr(event, 'role')
-                            and event.role == 'user'
-                            and hasattr(event, 'message')
-                        ):
-                            first_user_message = event.message
-                            break
-
-                    # Find all assistant messages in the history
-                    assistant_messages = []
-                    for event in state.history:
-                        if (
-                            hasattr(event, 'role')
-                            and event.role == 'assistant'
-                            and hasattr(event, 'message')
-                        ):
-                            assistant_messages.append(event.message)
-
-                    # If we have the first user message and assistant messages
-                    if first_user_message is not None:
-                        # Create a new messages list with only the first user message
-                        new_messages = [{'role': 'user', 'content': first_user_message}]
-
-                        # Add all assistant messages as prefixes
-                        for i, msg in enumerate(assistant_messages):
-                            # Add the assistant message as a prefix
-                            new_messages.append(
-                                {'role': 'assistant', 'content': msg, 'prefix': True}
-                            )
-
-                        # Replace the original messages with our new messages
-                        kwargs['messages'] = new_messages
-
-                        # Log the transformation
-                        logger.info(
-                            f'Transformed messages: First user message + {len(assistant_messages)} assistant prefixes'
-                        )
-
-                # Call the original completion method
-                return original_completion(*args, **kwargs)
-
-            # Replace the agent's completion method with our wrapper
-            state.agent.llm._completion = completion_with_prefix
-
-            logger.info('Prefix functionality enabled for assistant messages')
+            logger.info('Enabling single assistant message functionality')
+            
+            # Patch the LLM to use a single growing assistant message
+            patch_llm_for_single_assistant_message(state)
+            
+            logger.info('Single assistant message functionality enabled')
 
         return state
 
