@@ -458,7 +458,7 @@ def run_infer(
         data_split: Optional data split to use
     """
     # Load the dataset
-    dataset = load_dataset('AlexCuadron/AIME2025', split='train').to_pandas()
+    dataset = load_dataset('yentinglin/aime_2025', split='train').to_pandas()
 
     # Create the metadata
     llm_config = get_llm_config_arg(llm_config_name, llm_config_hash)
