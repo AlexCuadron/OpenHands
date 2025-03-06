@@ -248,6 +248,51 @@ class LLM(RetryMixin, DebugMixin):
                 messages = new_messages
                 kwargs['messages'] = messages
 
+            # Check if there are any assistant messages and if the first one is empty
+            assistant_messages = [msg for msg in messages if msg.get('role') == 'assistant']
+            if not assistant_messages or not assistant_messages[0].get('content'):
+                # Create a new messages list with our prefix
+                import copy
+                new_messages = copy.deepcopy(messages)
+                
+                # Add the thinking prefix message
+                thinking_prefix = {
+                    "content": "<think>\nOkay, I need to solve this geometry problem where the perimeter of triangle ABC is to be found. Let me start by setting up the problem and then verifying each step with code.\n\nFirst, I'll install the necessary libraries. The user mentioned using sympy, numpy, scipy, and matplotlib. So, I'll start with installing those.",
+                    "role": "assistant",
+                    "tool_calls": [{
+                        "id": "toolu_01",
+                        "type": "function",
+                        "function": {
+                            "name": "execute_ipython_cell",
+                            "arguments": "{\"code\": \"%pip install sympy numpy scipy matplotlib\"}"
+                        }
+                    }]
+                }
+                
+                # Add the tool response
+                tool_response = {
+                    "content": "Collecting sympy\r\n  Downloading sympy-1.13.3-py3-none-any.whl.metadata (12 kB)\r\nRequirement already satisfied: numpy in /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/lib/python3.12/site-packages (2.2.3)\r\nRequirement already satisfied: scipy in /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/lib/python3.12/site-packages (1.15.2)\r\nRequirement already satisfied: matplotlib in /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/lib/python3.12/site-packages (3.10.0)\r\nCollecting mpmath<1.4,>=1.1.0 (from sympy)\r\n  Downloading mpmath-1.3.0-py3-none-any.whl.metadata (8.6 kB)\r\nRequirement already satisfied: contourpy>=1.0.1 in /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/lib/python3.12/site-packages (from matplotlib) (1.3.1)\r\nRequirement already satisfied: cycler>=0.10 in /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/lib/python3.12/site-packages (from matplotlib) (0.12.1)\r\nRequirement already satisfied: fonttools>=4.22.0 in /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/lib/python3.12/site-packages (from matplotlib) (4.56.0)\r\nRequirement already satisfied: kiwisolver>=1.3.1 in /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/lib/python3.12/site-packages (from matplotlib) (1.4.8)\r\nRequirement already satisfied: packaging>=20.0 in /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/lib/python3.12/site-packages (from matplotlib) (24.2)\r\nRequirement already satisfied: pillow>=8 in /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/lib/python3.12/site-packages (from matplotlib) (11.1.0)\r\nRequirement already satisfied: pyparsing>=2.3.1 in /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/lib/python3.12/site-packages (from matplotlib) (3.2.1)\r\nRequirement already satisfied: python-dateutil>=2.7 in /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/lib/python3.12/site-packages (from matplotlib) (2.9.0.post0)\r\nRequirement already satisfied: six>=1.5 in /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/lib/python3.12/site-packages (from python-dateutil>=2.7->matplotlib) (1.17.0)\r\nDownloading sympy-1.13.3-py3-none-any.whl (6.2 MB)\r\n\u001b[?25l   \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501 0.0/6.2 MB ? eta -:--:--\r\u001b[2K   \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501 6.2/6.2 MB 86.5 MB/s eta 0:00:00\r\n\u001b[?25hDownloading mpmath-1.3.0-py3-none-any.whl (536 kB)\r\n\u001b[?25l   \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501 0.0/536.2 kB ? eta -:--:--\r\u001b[2K   \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501 536.2/536.2 kB 41.1 MB/s eta 0:00:00\r\n\u001b[?25hInstalling collected packages: mpmath, sympy\r\nSuccessfully installed mpmath-1.3.0 sympy-1.13.3\r\nNote: you may need to restart the kernel to use updated packages.\n[Jupyter current working directory: /workspace]\n[Jupyter Python interpreter: /openhands/poetry/openhands-ai-5O4_aCHf-py3.12/lib/python3.12/site-packages]",
+                    "role": "tool",
+                    "tool_call_id": "toolu_01",
+                    "name": "execute_ipython_cell"
+                }
+                
+                # Find the position to insert our messages
+                # If there's a system message, insert after it
+                system_indices = [i for i, msg in enumerate(new_messages) if msg.get('role') == 'system']
+                insert_position = system_indices[-1] + 1 if system_indices else 0
+                
+                # Insert our messages
+                new_messages.insert(insert_position, thinking_prefix)
+                new_messages.insert(insert_position + 1, tool_response)
+                
+                # Update the messages
+                messages = new_messages
+                if len(args) > 1:
+                    kwargs['messages'] = messages
+                else:
+                    kwargs['messages'] = messages
+
 
             # Process messages with prefix parameter
             # If a message has role=assistant and prefix=True, it should be treated as a prefix for the assistant
