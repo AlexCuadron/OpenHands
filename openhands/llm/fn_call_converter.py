@@ -45,7 +45,7 @@ Reminder:
 </IMPORTANT>
 """
 
-STOP_WORDS = ['</tool']
+STOP_WORDS = ['</tool', '</parameter']
 
 # NOTE: we need to make sure this example is always in-sync with the tool interface designed in openhands/agenthub/codeact_agent/tool_calling.py
 IN_CONTEXT_LEARNING_EXAMPLE_PREFIX = """
@@ -899,7 +899,9 @@ def convert_non_fncall_messages_to_fncall_messages(
                     )
 
                 # Parse parameters
-                param_matches = re.finditer(TOOL_PARAM_REGEX_PATTERN, fn_body, re.DOTALL)
+                param_matches = re.finditer(
+                    TOOL_PARAM_REGEX_PATTERN, fn_body, re.DOTALL
+                )
                 params = _extract_and_validate_params(
                     matching_tool, param_matches, fn_name
                 )
@@ -917,9 +919,7 @@ def convert_non_fncall_messages_to_fncall_messages(
                 # Remove the function call part from content
                 if isinstance(content, list):
                     assert content and content[-1]['type'] == 'text'
-                    content[-1]['text'] = (
-                        content[-1]['text'].split('<tool=')[0].strip()
-                    )
+                    content[-1]['text'] = content[-1]['text'].split('<tool=')[0].strip()
                 elif isinstance(content, str):
                     content = content.split('<tool=')[0].strip()
                 else:
