@@ -25,7 +25,8 @@ This is achieved through the following components:
 1. `single_message_prompt.py`: Provides a modified version of the `run_controller` function that ensures all instructions are sent in a single user message and prevents any additional user messages.
 2. `agent_controller_patch.py`: Patches the `AgentController` class to ensure it properly handles our single message approach.
 3. `single_role_messages.py`: Provides functionality to ensure there is only one user message and one assistant message.
-4. Updates to `run_infer.py`: Modified to use our patched components.
+4. `llm_logging_patch.py`: Patches the LLM logging mechanism to ensure that only user and assistant roles are used in the logged messages.
+5. Updates to `run_infer.py`: Modified to use our patched components.
 
 ## Usage
 
@@ -54,5 +55,7 @@ This will run the AIME2025 benchmark with a single instance and verify that the 
 4. **Tool Results Integration**: Tool results (observations) are included in the assistant message, formatted as "TOOL RESULT: [result]".
 
 5. **LLM Patching**: We patch the LLM's completion method to transform the messages before sending them to the LLM.
+
+6. **Logging Patching**: We patch the LLM's logging mechanism to ensure that only user and assistant roles are used in the logged messages.
 
 These changes ensure that the LLM receives a single, coherent set of instructions in one user message and maintains a single, growing assistant message, which should improve the consistency and quality of the responses.

@@ -10,6 +10,7 @@ from datasets import load_dataset
 import openhands.agenthub.codeact_agent.function_calling as codeact_function_calling
 from evaluation.benchmarks.aime2025.agent_controller_patch import patch_agent_controller
 from evaluation.benchmarks.aime2025.single_role_messages import patch_llm_for_single_role_messages
+from evaluation.benchmarks.aime2025.llm_logging_patch import patch_llm_logging
 from evaluation.benchmarks.aime2025.helper import (
     FAKE_RESPONSES,
     INST_SUFFIXES,
@@ -412,6 +413,9 @@ def process_instance(
             
             # Patch the LLM to use a single user message and a single assistant message
             patch_llm_for_single_role_messages(state)
+            
+            # Patch the LLM logging to use only user and assistant roles
+            patch_llm_logging(state)
             
             logger.info('Single role messages functionality enabled')
 
