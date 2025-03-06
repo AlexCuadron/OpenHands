@@ -28,7 +28,8 @@ This is achieved through the following components:
 4. `llm_logging_patch.py`: Patches the LLM logging mechanism to ensure that only user and assistant roles are used in the logged messages.
 5. `no_system_message_patch.py`: Patches the LLM to ensure that system messages are never used.
 6. `single_user_tag_patch.py`: Patches the LLM to ensure that there is always at most ONE user tag.
-7. Updates to `run_infer.py`: Modified to use our patched components.
+7. `no_system_calls_ever_patch.py`: Patches the LLM at the lowest level to ensure that system calls are NEVER made.
+8. Updates to `run_infer.py`: Modified to use our patched components.
 
 ## Usage
 
@@ -63,5 +64,7 @@ This will run the AIME2025 benchmark with a single instance and verify that the 
 7. **No System Messages**: We patch the LLM to ensure that system messages are never used at any level, including the internal LLM calls.
 
 8. **Single User Tag**: We patch the LLM to ensure that there is always at most ONE user tag, combining multiple user messages if necessary.
+
+9. **No System Calls Ever**: We patch the LLM at the lowest level to ensure that system calls are NEVER made, including in the `_completion_unwrapped` method and in litellm directly.
 
 These changes ensure that the LLM receives a single, coherent set of instructions in one user message and maintains a single, growing assistant message, which should improve the consistency and quality of the responses.

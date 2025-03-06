@@ -13,6 +13,7 @@ from evaluation.benchmarks.aime2025.single_role_messages import patch_llm_for_si
 from evaluation.benchmarks.aime2025.llm_logging_patch import patch_llm_logging
 from evaluation.benchmarks.aime2025.no_system_message_patch import patch_llm_to_never_use_system_messages
 from evaluation.benchmarks.aime2025.single_user_tag_patch import patch_llm_for_single_user_tag
+from evaluation.benchmarks.aime2025.no_system_calls_ever_patch import patch_llm_to_never_use_system_calls_ever
 from evaluation.benchmarks.aime2025.helper import (
     FAKE_RESPONSES,
     INST_SUFFIXES,
@@ -412,6 +413,9 @@ def process_instance(
             and hasattr(state.agent, 'llm')
         ):
             logger.info('Enabling single role messages functionality')
+            
+            # Patch the LLM to NEVER EVER use system calls
+            patch_llm_to_never_use_system_calls_ever(state)
             
             # Patch the LLM to never use system messages
             patch_llm_to_never_use_system_messages(state)
