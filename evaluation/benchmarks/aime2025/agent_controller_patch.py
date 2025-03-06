@@ -14,11 +14,11 @@ def patch_agent_controller():
     """
     Patch the AgentController class to ensure all instructions are sent in a single user message.
     """
-    # Store the original process_event method
-    original_process_event = AgentController.process_event
+    # Store the original _on_event method
+    original_on_event = AgentController._on_event
 
-    # Define a new process_event method that ensures single message
-    async def patched_process_event(self, event: Event):
+    # Define a new _on_event method that ensures single message
+    async def patched_on_event(self, event: Event):
         """
         Process an event, ensuring all instructions are sent in a single user message.
         """
@@ -48,10 +48,10 @@ def patch_agent_controller():
             # Log that we're using a single user message
             logger.info('Using single user message approach for AIME2025 benchmark')
         
-        # Call the original process_event method
-        return await original_process_event(self, event)
+        # Call the original _on_event method
+        return await original_on_event(self, event)
     
-    # Replace the original process_event method with our patched version
-    AgentController.process_event = patched_process_event
+    # Replace the original _on_event method with our patched version
+    AgentController._on_event = patched_on_event
     
     logger.info('AgentController patched to ensure single user message')

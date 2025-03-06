@@ -51,7 +51,8 @@ async def run_controller_single_message(
     await controller.initialize()
     
     # Process the initial user action
-    await controller.process_event(initial_user_action)
+    # Use the on_event method instead of process_event
+    controller.on_event(initial_user_action)
     
     # Set up event handling to prevent additional user messages
     event_stream = runtime.event_stream
