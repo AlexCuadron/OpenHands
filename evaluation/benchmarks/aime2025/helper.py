@@ -1,4 +1,9 @@
 from evaluation.utils.shared import codeact_user_response
+from openhands.events.action import MessageAction
+from openhands.core.message import Message
+
+# Flag to enable/disable the prefix functionality
+USE_PREFIX_FOR_ASSISTANT = True
 
 INSTRUCTIONS_ADDENDUM = """
 Please solve this problem by reasoning through each step and immediately verifying with Python code.

@@ -12,6 +12,7 @@ from evaluation.benchmarks.aime2025.helper import (
     FAKE_RESPONSES,
     INST_SUFFIXES,
     INSTRUCTIONS_ADDENDUM,
+    USE_PREFIX_FOR_ASSISTANT,
 )
 from evaluation.benchmarks.aime2025.thinking_agent import (
     analyze_overthinking,
@@ -389,6 +390,55 @@ def process_instance(
             logger.info(
                 f'Overriding agent tools with: {[tool.function.name for tool in override_tools]}'
             )
+        
+        # If prefix functionality is enabled, modify the agent's LLM to use prefixes
+        if USE_PREFIX_FOR_ASSISTANT and hasattr(state, 'agent') and hasattr(state.agent, 'llm'):
+            logger.info('Enabling prefix functionality for assistant messages')
+            
+            # Store the original completion method
+            original_completion = state.agent.llm.completion
+            
+            # Create a wrapper function that adds the prefix parameter to assistant messages
+            def completion_with_prefix(*args, **kwargs):
+                # Get the messages from kwargs
+                if 'messages' in kwargs:
+                    messages = kwargs['messages']
+                    
+                    # Find all assistant messages in the history
+                    assistant_messages = []
+                    for event in state.history:
+                        if hasattr(event, 'role') and event.role == 'assistant' and hasattr(event, 'message'):
+                            assistant_messages.append(event.message)
+                    
+                    # If we have assistant messages, add them as prefixes
+                    if assistant_messages:
+                        # Create a new messages list with the original user message
+                        user_message = None
+                        for msg in messages:
+                            if isinstance(msg, dict) and msg.get('role') == 'user':
+                                user_message = msg
+                                break
+                        
+                        if user_message is not None:
+                            # Add all assistant messages as prefixes
+                            for i, msg in enumerate(assistant_messages):
+                                # Add the assistant message as a prefix
+                                messages.append({
+                                    'role': 'assistant',
+                                    'content': msg,
+                                    'prefix': True
+                                })
+                            
+                            # Update the messages in kwargs
+                            kwargs['messages'] = messages
+                
+                # Call the original completion method
+                return original_completion(*args, **kwargs)
+            
+            # Replace the agent's completion method with our wrapper
+            state.agent.llm._completion = completion_with_prefix
+            
+            logger.info('Prefix functionality enabled for assistant messages')
 
         return state
 
