@@ -14,7 +14,7 @@ The original implementation of the AIME2025 benchmark sent multiple messages to 
 
 We've implemented a "Single Message Mode" that ensures all instructions are sent in a single user message. This is achieved through the following components:
 
-1. `single_message_prompt.py`: Provides a modified version of the `run_controller` function that ensures all instructions are sent in a single user message.
+1. `single_message_prompt.py`: Provides a modified version of the `run_controller` function that ensures all instructions are sent in a single user message and prevents any additional user messages.
 2. `agent_controller_patch.py`: Patches the `AgentController` class to ensure it properly handles our single message approach.
 3. Updates to `run_infer.py`: Modified to use our patched components.
 
@@ -36,18 +36,12 @@ This will run the AIME2025 benchmark with a single instance and verify that the 
 
 The key changes are:
 
-1. We patch the `AgentController.process_event` method to ensure that only one user message is in the history at any time.
-2. We patch the `AgentController._get_fake_user_response` method to prevent additional user messages from being sent.
-3. We patch the `AgentController.run_agent_loop` method to handle the Python reminder flag.
-4. We use a custom `run_controller_single_message` function that ensures all instructions are sent in a single user message.
-5. We apply these patches before running the controller.
+1. **Preventing Additional User Messages**: We've completely replaced the fake user response function with one that always returns '/exit' to prevent any additional user messages from being sent.
 
-### Handling Additional User Messages
+2. **Event Handling**: We've added event handling to detect when the agent is waiting for user input and automatically finish the interaction instead of sending a new user message.
 
-The enhanced implementation now handles several scenarios where additional user messages might be sent:
+3. **Process Event Patching**: We've patched the `AgentController.process_event` method to ensure that only one user message is in the history at any time and to intercept any follow-up user messages.
 
-1. **Python Reminders**: When the agent hasn't used Python yet, instead of sending a reminder message, we set a flag that will be checked in the run_agent_loop patch.
-2. **Finish Without Python**: When the agent tries to finish without using Python, we intercept this and prevent it from finishing.
-3. **Follow-up Messages**: Any follow-up messages from the user are intercepted and not processed, to maintain the single message approach.
+4. **Custom Run Controller**: We use a custom `run_controller_single_message` function that ensures all instructions are sent in a single user message and sets up the necessary event handling.
 
 These changes ensure that the LLM receives a single, coherent set of instructions in one user message, which should improve the consistency and quality of the responses.
