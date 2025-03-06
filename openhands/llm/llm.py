@@ -204,8 +204,6 @@ class LLM(RetryMixin, DebugMixin):
 
             # Modify messages to merge the first two roles into "user" and add a third one called "assistant"
             if len(messages) >= 2:
-                # Log original messages for debugging
-                logger.debug(f'Original messages: {messages}')
 
                 # Create a new list of messages
                 new_messages = []
@@ -250,8 +248,6 @@ class LLM(RetryMixin, DebugMixin):
                 messages = new_messages
                 kwargs['messages'] = messages
 
-                # Log modified messages for debugging
-                logger.debug(f'Modified messages: {messages}')
 
             # Process messages with prefix parameter
             # If a message has role=assistant and prefix=True, it should be treated as a prefix for the assistant
