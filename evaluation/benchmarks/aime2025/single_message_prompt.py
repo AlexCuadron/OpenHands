@@ -10,6 +10,7 @@ from openhands.controller.agent_controller import AgentController
 from openhands.controller.state.state import State
 from openhands.core.config import AppConfig
 from openhands.core.logger import openhands_logger as logger
+from openhands.core.loop import run_agent_until_done
 from openhands.core.schema import AgentState
 from openhands.core.setup import create_agent, create_controller
 from openhands.events import EventSource, EventStreamSubscriber
@@ -55,13 +56,10 @@ async def run_controller_single_message(
     if fake_user_response_fn:
         runtime.event_stream.fake_user_response_fn = single_message_fake_user_response
     
-    # Process the initial user action
-    # Use the on_event method to process the event
-    controller.on_event(initial_user_action)
+    # Add the initial user action to the event stream
+    runtime.event_stream.add_event(initial_user_action, EventSource.USER)
     
     # Set up event handling to prevent additional user messages
-    event_stream = runtime.event_stream
-    
     def on_event(event: Event):
         if isinstance(event, AgentStateChangedObservation):
             if event.agent_state == AgentState.AWAITING_USER_INPUT:
@@ -70,7 +68,7 @@ async def run_controller_single_message(
                 asyncio.create_task(controller.set_agent_state_to(AgentState.FINISHED))
     
     # Subscribe to events
-    event_stream.subscribe(EventStreamSubscriber.MAIN, on_event, event_stream.sid)
+    runtime.event_stream.subscribe(EventStreamSubscriber.MAIN, on_event, runtime.event_stream.sid)
     
     # Define the end states
     end_states = [
@@ -82,8 +80,7 @@ async def run_controller_single_message(
     ]
     
     # Run the agent until it reaches an end state
-    while controller.state.agent_state not in end_states:
-        await asyncio.sleep(1)
+    await run_agent_until_done(controller, runtime, end_states)
     
     # Return the final state
     return controller.state
