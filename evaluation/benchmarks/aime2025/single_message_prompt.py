@@ -56,9 +56,8 @@ async def run_controller_single_message(
     if fake_user_response_fn:
         runtime.event_stream.fake_user_response_fn = single_message_fake_user_response
     
-    # Process the initial user action
-    # Use the on_event method to process the event
-    controller.on_event(initial_user_action)
+    # Add the initial user action to the event stream directly
+    runtime.event_stream.add_event(initial_user_action, EventSource.USER)
     
     # Set up event handling to prevent additional user messages
     event_stream = runtime.event_stream
@@ -89,8 +88,14 @@ async def run_controller_single_message(
     # Run the agent until it reaches an end state or finish is requested
     while controller.state.agent_state not in end_states:
         if finish_requested:
-            # Set the agent state to FINISHED synchronously
-            asyncio.run(controller.set_agent_state_to(AgentState.FINISHED))
+            # Set the agent state to FINISHED
+            # We need to create a new event loop for this
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(controller.set_agent_state_to(AgentState.FINISHED))
+            finally:
+                loop.close()
             break
         await asyncio.sleep(1)
     
