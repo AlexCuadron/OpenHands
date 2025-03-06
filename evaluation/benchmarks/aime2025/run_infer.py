@@ -2,29 +2,22 @@ import asyncio
 import copy
 import os
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from datasets import load_dataset
 
 import openhands.agenthub.codeact_agent.function_calling as codeact_function_calling
-from evaluation.benchmarks.aime2025.agent_controller_patch import patch_agent_controller
-from evaluation.benchmarks.aime2025.single_role_messages import patch_llm_for_single_role_messages
-from evaluation.benchmarks.aime2025.llm_logging_patch import patch_llm_logging
-from evaluation.benchmarks.aime2025.no_system_message_patch import patch_llm_to_never_use_system_messages
-from evaluation.benchmarks.aime2025.single_user_tag_patch import patch_llm_for_single_user_tag
-from evaluation.benchmarks.aime2025.no_system_calls_ever_patch import patch_llm_to_never_use_system_calls_ever
+from evaluation.benchmarks.aime2025.aime2025_llm_patch import patch_llm_for_aime2025_benchmark
 from evaluation.benchmarks.aime2025.helper import (
     FAKE_RESPONSES,
     INST_SUFFIXES,
     INSTRUCTIONS_ADDENDUM,
     USE_PREFIX_FOR_ASSISTANT,
 )
-from evaluation.benchmarks.aime2025.single_message_prompt import (
-    run_controller_single_message,
-)
 from evaluation.benchmarks.aime2025.thinking_agent import (
     analyze_overthinking,
+    get_thinking_agent_llm,
     should_discard_solution,
 )
 from evaluation.utils.shared import (
@@ -46,7 +39,7 @@ from openhands.core.config import (
     load_from_toml,
 )
 from openhands.core.logger import openhands_logger as logger
-from openhands.core.main import create_runtime
+from openhands.core.main import create_runtime, run_controller
 from openhands.events.action import AgentFinishAction, MessageAction
 from openhands.runtime.base import Runtime
 from openhands.utils.async_utils import call_async_from_sync
@@ -81,10 +74,10 @@ def get_config(
     llm_config = update_llm_config_for_completions_logging(
         metadata.llm_config, metadata.eval_output_dir, str(instance.instance_id)
     )
-
+    
     # Set temperature to 0.6 as recommended for mathematical problems
     llm_config.temperature = 0.6
-    logger.info('Set temperature to 0.6 for AIME2025 benchmark')
+    logger.info(f'Set temperature to 0.6 for AIME2025 benchmark')
 
     # Disable native tool calling for Together.ai models
     if llm_config and (
@@ -297,10 +290,7 @@ def extract_answer(history: List[Dict], ground_truth: str) -> str:
 
 
 def evaluate_answer(
-    predicted_answer: str,
-    ground_truth: str,
-    history: List[Dict],
-    metadata: EvalMetadata,
+    predicted_answer: str, ground_truth: str, history: List[Dict], metadata: EvalMetadata
 ) -> Dict[str, Any]:
     """
     Evaluate the predicted answer against the ground truth.
@@ -375,10 +365,9 @@ def process_instance(
     runtime: Runtime = create_runtime(config)
     call_async_from_sync(runtime.connect)
 
-    # Apply the patch to ensure single user message
-    patch_agent_controller()
-    logger.info('Applied AgentController patch for single user message')
-
+    # Apply the AIME2025 LLM patch
+    logger.info('Applying AIME2025 LLM patch')
+    
     # Get the override_tools from metadata details if it exists
     override_tools = (
         metadata.details.get('override_tools', None) if metadata.details else None
@@ -386,8 +375,8 @@ def process_instance(
 
     # Define a custom run_controller function that overrides the tools if needed
     async def custom_run_controller():
-        # Run the controller with a single user message
-        state = await run_controller_single_message(
+        # Run the controller normally
+        state = await run_controller(
             config=config,
             initial_user_action=MessageAction(content=instruction),
             runtime=runtime,
@@ -406,316 +395,127 @@ def process_instance(
                 f'Overriding agent tools with: {[tool.function.name for tool in override_tools]}'
             )
 
-        # If prefix functionality is enabled, modify the agent's LLM to use a single growing assistant message
-        if (
-            USE_PREFIX_FOR_ASSISTANT
-            and hasattr(state, 'agent')
-            and hasattr(state.agent, 'llm')
-        ):
-            logger.info('Enabling single role messages functionality')
-            
-            # Patch the LLM to NEVER EVER use system calls
-            patch_llm_to_never_use_system_calls_ever(state)
-            
-            # Patch the LLM to never use system messages
-            patch_llm_to_never_use_system_messages(state)
-            
-            # Patch the LLM to ensure at most ONE user tag
-            patch_llm_for_single_user_tag(state)
-            
-            # Patch the LLM to use a single user message and a single assistant message
-            patch_llm_for_single_role_messages(state)
-            
-            # Patch the LLM logging to use only user and assistant roles
-            patch_llm_logging(state)
-            
-            logger.info('Single role messages functionality enabled')
+        # Apply the AIME2025 LLM patch
+        if hasattr(state, 'agent') and hasattr(state.agent, 'llm'):
+            logger.info('Applying AIME2025 LLM patch')
+            patch_llm_for_aime2025_benchmark(state)
+            logger.info('AIME2025 LLM patch applied')
 
         return state
 
     # Here's how you can run the agent (similar to the `main` function) and get the final task state
     state: State | None = asyncio.run(custom_run_controller())
-    if state is None:
-        raise ValueError('State should not be None.')
 
     # =============================================
-    # result evaluation
+    # extract answer and evaluate
     # =============================================
 
-    # Extract the answer from the agent's response
-    predicted_answer = None
+    # Extract the answer from the agent's history
+    predicted_answer = extract_answer(state.history, instance.answer)
 
-    # Check if the agent used the finish tool with a solution
-    finish_action = next(
-        (
-            event
-            for event in reversed(state.history)
-            if isinstance(event, AgentFinishAction)
-        ),
-        None,
-    )
+    # Evaluate the answer
+    results = evaluate_answer(predicted_answer, instance.answer, state.history, metadata)
 
-    # Try multiple methods to extract the answer
-    possible_answers = []
-
-    # Method 1: Extract from finish action solution attribute
-    if finish_action and hasattr(finish_action, 'solution') and finish_action.solution:
-        # The solution attribute is available and not empty
-        possible_answers.append(finish_action.solution)
-        logger.info(f'Found solution in finish action: {finish_action.solution}')
-
-    # Method 2: Extract from finish action outputs dictionary
-    if finish_action and hasattr(finish_action, 'outputs'):
-        outputs = finish_action.outputs
-        if isinstance(outputs, dict) and 'solution' in outputs and outputs['solution']:
-            # The outputs dictionary has a solution key with a non-empty value
-            possible_answers.append(outputs['solution'])
-            logger.info(
-                f'Found solution in finish action outputs: {outputs["solution"]}'
-            )
-
-    # Method 3: Extract from finish action params dictionary
-    if finish_action and hasattr(finish_action, 'params'):
-        params = finish_action.params
-        if isinstance(params, dict) and 'solution' in params and params['solution']:
-            # The params dictionary has a solution key with a non-empty value
-            possible_answers.append(params['solution'])
-            logger.info(f'Found solution in finish action params: {params["solution"]}')
-
-    # Method 4: Look for boxed expressions in the last few messages
-    last_messages = [
-        event.message
-        for event in reversed(state.history)
-        if hasattr(event, 'message')
-        and event.message
-        and hasattr(event, 'role')
-        and event.role == 'assistant'
-    ][:3]  # Look at the last 3 assistant messages
-
-    for message in last_messages:
-        boxed_matches = re.findall(r'\\boxed{([^}]*)}', message)
-        for match in boxed_matches:
-            possible_answers.append(match)
-            logger.info(f'Found boxed expression: {match}')
-
-    # Method 5: Look for "the answer is" or similar phrases
-    for message in last_messages:
-        answer_matches = re.findall(
-            r'(?:the|final)\s+answer\s+is\s+(?:\\boxed{)?([^}]+)(?:})?',
-            message,
-            re.IGNORECASE,
-        )
-        for match in answer_matches:
-            possible_answers.append(match)
-            logger.info(f'Found answer in text: {match}')
-
-    # If we found any possible answers, use the first one
-    if possible_answers:
-        # Normalize the answers (remove non-numeric characters)
-        normalized_answers = [
-            re.sub(r'[^0-9-]', '', str(ans)) for ans in possible_answers
-        ]
-        logger.info(f'Normalized possible answers: {normalized_answers}')
-
-        # For AIME problems, prefer answers that are just numbers
-        numeric_answers = [ans for ans in normalized_answers if ans.isdigit()]
-        if numeric_answers:
-            predicted_answer = numeric_answers[0]
-            logger.info(f'Selected numeric answer: {predicted_answer}')
-        else:
-            predicted_answer = possible_answers[0]
-            logger.info(f'Selected first available answer: {predicted_answer}')
-    else:
-        predicted_answer = None
-        logger.warning("Could not find any answer in the agent's response")
-
-    # Normalize answers for comparison
-    predicted_norm = predicted_answer if predicted_answer is not None else ''
-    reference_norm = instance.answer if instance.answer is not None else ''
-
-    # Check if the predicted answer matches the reference answer
-    is_correct = predicted_norm == reference_norm
-
-    # Create the test result
-    test_result = {
-        'predicted_answer': predicted_norm,
-        'reference_answer': reference_norm,
-        'is_correct': is_correct,
-    }
-
-    # Check if we should discard the solution due to overthinking
-    if (
-        hasattr(metadata, 'overthinking_threshold')
-        and metadata.overthinking_threshold is not None
-    ):
-        try:
-            # Get the overthinking threshold from metadata
-            overthinking_threshold = int(metadata.overthinking_threshold)
-
-            # Analyze the solution for overthinking
-            overthinking_score, analysis = analyze_overthinking(state.history)
-
-            # Save the analysis to a file
-            overthinking_dir = os.path.join(
-                metadata.eval_output_dir, 'overthinking_analysis'
-            )
-            os.makedirs(overthinking_dir, exist_ok=True)
-
-            analysis_file = os.path.join(
-                overthinking_dir, f'instance_{instance.instance_id}.txt'
-            )
-            with open(analysis_file, 'w') as f:
-                f.write(f'Overthinking Score: {overthinking_score}/10\n\n')
-                f.write(analysis)
-
-            # Add overthinking analysis to test_result
-            test_result['overthinking_score'] = overthinking_score
-            test_result['overthinking_analysis'] = analysis
-
-            logger.info(
-                f'Overthinking analysis completed. Score: {overthinking_score}/10'
-            )
-            logger.info(f'Overthinking analysis files saved to: {overthinking_dir}')
-
-            # Check if the solution should be discarded based on the overthinking score
-            if should_discard_solution(overthinking_score, int(overthinking_threshold)):
-                logger.warning(
-                    f'Solution discarded due to high overthinking score: {overthinking_score} > {overthinking_threshold}'
-                )
-
-                # Instead of just marking as incorrect, raise an exception to trigger a retry
-                raise Exception(
-                    f'Overthinking detected with score {overthinking_score} > threshold {overthinking_threshold}. Retrying...'
-                )
-            else:
-                test_result['solution_discarded'] = False
-        except Exception as e:
-            logger.error(f'Error during overthinking analysis: {e}')
-            test_result['overthinking_error'] = str(e)
-
-    # Save the output
+    # Create the evaluation output
     output = EvalOutput(
-        instance_id=str(instance.instance_id),
-        instance=instance.to_dict(),
-        instruction=instruction,
-        metadata=metadata,
+        instance_id=instance.instance_id,
         history=compatibility_for_eval_history_pairs(state.history),
-        metrics={
-            'is_correct': is_correct,
-            'predicted_answer': predicted_norm,
-            'ground_truth': reference_norm,
-        },
-        error=state.last_error if state and state.last_error else None,
-        test_result=test_result,
+        results=results,
     )
+
     return output
 
 
-def load_aime2025_dataset() -> pd.DataFrame:
+def run_infer(
+    llm_config_name: str,
+    llm_config_hash: str,
+    agent_class: str,
+    eval_n_limit: int,
+    eval_ids: list[str] | None = None,
+    skip_num: int | None = None,
+    allowed_tools: str = 'all',
+    overthinking_threshold: float | None = None,
+    use_mp: bool = False,
+    mp_workers: int = 4,
+    output_dir: str | None = None,
+    data_split: str | None = None,
+):
     """
-    Load the AIME2025 dataset.
+    Run inference on the AIME2025 dataset.
 
-    Returns:
-        pd.DataFrame: The AIME2025 dataset
+    Args:
+        llm_config_name: The name of the LLM config to use
+        llm_config_hash: The hash of the LLM config to use
+        agent_class: The agent class to use
+        eval_n_limit: The number of instances to evaluate
+        eval_ids: Optional list of instance IDs to evaluate
+        skip_num: Optional number of instances to skip
+        allowed_tools: The tools to allow the agent to use
+        overthinking_threshold: Optional threshold for overthinking detection
+        use_mp: Whether to use multiprocessing
+        mp_workers: The number of workers to use for multiprocessing
+        output_dir: Optional output directory
+        data_split: Optional data split to use
     """
-    # Load the dataset from Hugging Face
-    dataset = load_dataset('yentinglin/aime_2025')
+    # Load the dataset
+    dataset = load_dataset('AlexCuadron/AIME2025', split='train').to_pandas()
 
-    # Convert to pandas DataFrame
-    df = pd.DataFrame(dataset['train'])
-
-    return df
-
-
-def parse_aime2025_arguments():
-    """Parse command-line arguments for the AIME2025 benchmark."""
-    parser = get_parser()
-
-    # Add custom argument for allowed tools
-    parser.add_argument(
-        '--allowed-tools',
-        type=str,
-        default='all',
-        help='Comma-separated list of allowed tools for the agent. Options: all, ipython_only, bash_only, no_editor',
-    )
-
-    # Add custom argument for overthinking threshold
-    parser.add_argument(
-        '--overthinking-threshold',
-        type=float,
-        default=None,
-        help='Threshold for determining overthinking (default: None)',
-    )
-
-    return parser.parse_args()
-
-
-if __name__ == '__main__':
-    args = parse_aime2025_arguments()
-
-    # Load the AIME2025 dataset
-    df = load_aime2025_dataset()
-
-    # Add instance_id if not present
-    if 'instance_id' not in df.columns:
-        df['instance_id'] = df['id'].apply(lambda x: f'aime2025_{x}')
-
-    llm_config = None
-    if args.llm_config:
-        llm_config = get_llm_config_arg(args.llm_config)
-        if llm_config is not None:
-            # modify_params must be False for evaluation purpose, for reproducibility and accuracy of results
-            llm_config.modify_params = False
-
-    if llm_config is None:
-        raise ValueError(f'Could not find LLM config: --llm_config {args.llm_config}')
-
-    # Create agent details dictionary
-    agent_details = {}
-
-    # Create metadata for evaluation
+    # Create the metadata
+    llm_config = get_llm_config_arg(llm_config_name, llm_config_hash)
     metadata = make_metadata(
-        llm_config,
-        'AIME2025',
-        args.agent_cls,  # This is the argument name from the command line, but make_metadata expects agent_class
-        args.max_iterations,
-        args.eval_note,
-        args.eval_output_dir,
-        details=agent_details,
+        agent_class=agent_class,
+        llm_config=llm_config,
+        max_iterations=30,
+        dataset='AIME2025',
+        data_split=data_split,
+        details={'allowed_tools': allowed_tools},
+        overthinking_threshold=overthinking_threshold,
+        output_dir=output_dir,
     )
 
-    # Add the allowed_tools parameter to the metadata details
-    if metadata.details is None:
-        metadata.details = {}
-    metadata.details['allowed_tools'] = args.allowed_tools
-
-    # Add the overthinking threshold if provided
-    if args.overthinking_threshold is not None:
-        metadata.overthinking_threshold = args.overthinking_threshold
-        metadata.details['overthinking_threshold'] = args.overthinking_threshold
-        logger.info(f'\nUsing overthinking threshold: {args.overthinking_threshold}\n')
-
+    # Prepare the dataset
     output_file = os.path.join(metadata.eval_output_dir, 'output.jsonl')
-
-    # Parse dataset IDs if provided
-    eval_ids = None
-    if args.eval_ids:
-        eval_ids = str(args.eval_ids).split(',')
-        logger.info(f'\nUsing specific dataset IDs: {eval_ids}\n')
-
-    # Prepare the dataset for evaluation
-    instances = prepare_dataset(
-        df,
-        output_file,
-        args.eval_n_limit,
-        eval_ids=eval_ids,
-    )
+    dataset = prepare_dataset(dataset, output_file, eval_n_limit, eval_ids, skip_num)
 
     # Run the evaluation
     run_evaluation(
-        instances,
-        metadata,
-        output_file,
-        args.eval_num_workers,
-        process_instance,
+        dataset=dataset,
+        metadata=metadata,
+        process_instance_func=process_instance,
+        output_file=output_file,
+        use_mp=use_mp,
+        mp_workers=mp_workers,
+    )
+
+
+if __name__ == '__main__':
+    parser = get_parser()
+    parser.add_argument(
+        '--allowed_tools',
+        type=str,
+        default='all',
+        choices=['all', 'ipython_only', 'bash_only', 'no_editor'],
+        help='The tools to allow the agent to use',
+    )
+    parser.add_argument(
+        '--overthinking_threshold',
+        type=float,
+        default=None,
+        help='The threshold for overthinking detection',
+    )
+    args = parser.parse_args()
+
+    run_infer(
+        llm_config_name=args.llm_config_name,
+        llm_config_hash=args.llm_config_hash,
+        agent_class=args.agent_class,
+        eval_n_limit=args.eval_n_limit,
+        eval_ids=args.eval_ids,
+        skip_num=args.skip_num,
+        allowed_tools=args.allowed_tools,
+        overthinking_threshold=args.overthinking_threshold,
+        use_mp=args.use_mp,
+        mp_workers=args.mp_workers,
+        output_dir=args.output_dir,
+        data_split=args.data_split,
     )
