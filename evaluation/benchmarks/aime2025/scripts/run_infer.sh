@@ -61,10 +61,11 @@ echo "MODEL_CONFIG: $MODEL_CONFIG"
 EVAL_NOTE=$OPENHANDS_VERSION
 
 COMMAND="export PYTHONPATH=evaluation/benchmarks/aime2025:\$PYTHONPATH && poetry run python evaluation/benchmarks/aime2025/run_infer.py \
-  --agent-cls $AGENT \
-  --llm-config $MODEL_CONFIG \
+  --agent-class $AGENT \
+  --llm-config-name $MODEL_CONFIG \
+  --llm-config-hash $COMMIT_HASH \
   --max-iterations 30 \
-  --eval-num-workers $NUM_WORKERS \
+  --mp-workers $NUM_WORKERS \
   --eval-note $EVAL_NOTE \
   --allowed_tools $ALLOWED_TOOLS \
   $CONFIG_FILE_ARG"

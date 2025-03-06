@@ -491,6 +491,12 @@ def run_infer(
 if __name__ == '__main__':
     parser = get_parser()
     parser.add_argument(
+        '--llm-config-hash',
+        type=str,
+        default='HEAD',
+        help='The hash of the LLM config to use',
+    )
+    parser.add_argument(
         '--allowed_tools',
         type=str,
         default='all',
@@ -503,19 +509,36 @@ if __name__ == '__main__':
         default=None,
         help='The threshold for overthinking detection',
     )
+    parser.add_argument(
+        '--skip-num',
+        type=int,
+        default=None,
+        help='The number of instances to skip',
+    )
+    parser.add_argument(
+        '--use-mp',
+        action='store_true',
+        help='Whether to use multiprocessing',
+    )
+    parser.add_argument(
+        '--data-split',
+        type=str,
+        default=None,
+        help='The data split to use',
+    )
     args = parser.parse_args()
 
     run_infer(
-        llm_config_name=args.llm_config_name,
+        llm_config_name=args.llm_config,
         llm_config_hash=args.llm_config_hash,
-        agent_class=args.agent_class,
+        agent_class=args.agent_cls,
         eval_n_limit=args.eval_n_limit,
         eval_ids=args.eval_ids,
         skip_num=args.skip_num,
         allowed_tools=args.allowed_tools,
         overthinking_threshold=args.overthinking_threshold,
         use_mp=args.use_mp,
-        mp_workers=args.mp_workers,
-        output_dir=args.output_dir,
+        mp_workers=args.eval_num_workers,
+        output_dir=args.eval_output_dir,
         data_split=args.data_split,
     )
