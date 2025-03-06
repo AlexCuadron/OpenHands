@@ -202,12 +202,54 @@ class LLM(RetryMixin, DebugMixin):
             # ensure we work with a list of messages
             messages = messages if isinstance(messages, list) else [messages]
             
+            # Modify messages to merge the first two roles into "user" and add a third one called "assistant"
+            if len(messages) >= 2:
+                # Log original messages for debugging
+                logger.debug(f"Original messages: {messages}")
+                
+                # Create a new list of messages
+                new_messages = []
+                
+                # Merge the first two messages into a single "user" message
+                first_content = messages[0].get('content', '') if isinstance(messages[0], dict) else ''
+                second_content = messages[1].get('content', '') if isinstance(messages[1], dict) else ''
+                
+                # Create the merged user message
+                user_message = {
+                    'role': 'user',
+                    'content': f"{first_content}\n\n{second_content}".strip()
+                }
+                new_messages.append(user_message)
+                
+                # Add a third message as "assistant" that merges all remaining messages
+                if len(messages) > 2:
+                    remaining_contents = []
+                    for msg in messages[2:]:
+                        if isinstance(msg, dict):
+                            remaining_contents.append(msg.get('content', ''))
+                    
+                    assistant_message = {
+                        'role': 'assistant',
+                        'content': '\n\n'.join(remaining_contents).strip()
+                    }
+                    
+                    # Only add the assistant message if it has content
+                    if assistant_message['content']:
+                        new_messages.append(assistant_message)
+                
+                # Replace the original messages with our new ones
+                messages = new_messages
+                kwargs['messages'] = messages
+                
+                # Log modified messages for debugging
+                logger.debug(f"Modified messages: {messages}")
+            
             # Process messages with prefix parameter
             # If a message has role=assistant and prefix=True, it should be treated as a prefix for the assistant
             # We'll modify the user message to include the assistant prefix
             user_message_idx = None
             assistant_prefixes = []
-            
+
             # First, find the user message and any assistant messages with prefix=True
             for i, msg in enumerate(messages):
                 if isinstance(msg, dict):
@@ -217,28 +259,34 @@ class LLM(RetryMixin, DebugMixin):
                         assistant_prefixes.append(msg.get('content', ''))
                         # Remove the prefix parameter as it's not standard for LLM APIs
                         if 'prefix' in msg:
-                            messages[i] = {k: v for k, v in msg.items() if k != 'prefix'}
-            
+                            messages[i] = {
+                                k: v for k, v in msg.items() if k != 'prefix'
+                            }
+
             # If we found both a user message and assistant prefixes, modify the user message
             if user_message_idx is not None and assistant_prefixes:
                 user_content = messages[user_message_idx].get('content', '')
                 assistant_prefix = ' '.join(assistant_prefixes)
-                
+
                 # Create a system message that instructs the model to continue from the prefix
                 system_message = {
                     'role': 'system',
-                    'content': f'The assistant has already started their response with: "{assistant_prefix}". Continue the response from there.'
+                    'content': f'The assistant has already started their response with: "{assistant_prefix}". Continue the response from there.',
                 }
-                
+
                 # Insert the system message before the user message
                 messages.insert(user_message_idx, system_message)
-                
+
                 # Remove the assistant prefix messages
-                messages = [msg for msg in messages if not (
-                    isinstance(msg, dict) and 
-                    msg.get('role') == 'assistant' and 
-                    msg.get('content') in assistant_prefixes
-                )]
+                messages = [
+                    msg
+                    for msg in messages
+                    if not (
+                        isinstance(msg, dict)
+                        and msg.get('role') == 'assistant'
+                        and msg.get('content') in assistant_prefixes
+                    )
+                ]
 
             # handle conversion of to non-function calling messages if needed
             original_fncall_messages = copy.deepcopy(messages)
@@ -275,7 +323,7 @@ class LLM(RetryMixin, DebugMixin):
 
             # Record start time for latency measurement
             start_time = time.time()
-            
+
             with ensure_httpx_close():
                 # we don't support streaming here, thus we get a ModelResponse
                 resp: ModelResponse = self._completion_unwrapped(*args, **kwargs)
@@ -702,7 +750,7 @@ class LLM(RetryMixin, DebugMixin):
                         # Don't log anything for unmapped models to avoid polluting the output
                     else:
                         logger.error(f'Error getting cost from litellm: {e}')
-                except Exception as e:
+                except Exception:
                     # Don't log anything for exceptions to avoid polluting the output
                     cost = 0.0
 
@@ -721,7 +769,9 @@ class LLM(RetryMixin, DebugMixin):
                         cost = 0.0
                         # Don't log anything for unmapped models to avoid polluting the output
                     else:
-                        logger.error(f'Error getting cost from litellm with fallback model name: {e}')
+                        logger.error(
+                            f'Error getting cost from litellm with fallback model name: {e}'
+                        )
                 except Exception:
                     # Don't log anything for exceptions to avoid polluting the output
                     cost = 0.0
