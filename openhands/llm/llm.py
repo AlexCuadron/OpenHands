@@ -299,10 +299,6 @@ class LLM(RetryMixin, DebugMixin):
             original_fncall_messages = copy.deepcopy(messages)
             mock_fncall_tools = None
 
-            import pdb
-
-            pdb.set_trace()
-
             # if the agent or caller has defined tools, and we mock via prompting, convert the messages
             if mock_function_calling and 'tools' in kwargs:
                 messages = convert_fncall_messages_to_non_fncall_messages(
@@ -336,17 +332,9 @@ class LLM(RetryMixin, DebugMixin):
             # Record start time for latency measurement
             start_time = time.time()
 
-            import pdb
-
-            pdb.set_trace()
-
             with ensure_httpx_close():
                 # we don't support streaming here, thus we get a ModelResponse
                 resp: ModelResponse = self._completion_unwrapped(*args, **kwargs)
-
-            import pdb
-
-            pdb.set_trace()
 
             # Calculate and record latency
             latency = time.time() - start_time
