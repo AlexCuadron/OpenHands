@@ -12,8 +12,13 @@ ENV POETRY_VIRTUALENVS_PATH=/openhands/poetry \
 
 {% macro setup_base_system() %}
 
+# Set non-interactive environment variables
+ENV DEBIAN_FRONTEND=noninteractive \
+    DEBCONF_NONINTERACTIVE_SEEN=true
+
 # Install base system dependencies
 RUN apt-get update && \
+    echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && \
     apt-get install -y --no-install-recommends \
         wget curl sudo apt-utils git jq tmux \
         {%- if 'ubuntu' in base_image and (base_image.endswith(':latest') or base_image.endswith(':24.04')) -%}
@@ -22,8 +27,9 @@ RUN apt-get update && \
         libgl1-mesa-glx \
         {% endif -%}
         libasound2-plugins libatomic1 && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get clean -y && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Remove UID 1000 if it's called pn--this fixes the nikolaik image for ubuntu users
 RUN if getent passwd 1000 | grep -q pn; then userdel pn; fi
@@ -89,8 +95,10 @@ RUN \
     /openhands/micromamba/bin/micromamba run -n openhands poetry install --only main,runtime --no-interaction --no-root && \
     # Update and install additional tools
     apt-get update && \
-    /openhands/micromamba/bin/micromamba run -n openhands poetry run pip install playwright && \
-    /openhands/micromamba/bin/micromamba run -n openhands poetry run playwright install --with-deps chromium && \
+    # Install playwright and its dependencies non-interactively
+    DEBIAN_FRONTEND=noninteractive /openhands/micromamba/bin/micromamba run -n openhands poetry run pip install playwright && \
+    DEBIAN_FRONTEND=noninteractive PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 /openhands/micromamba/bin/micromamba run -n openhands poetry run playwright install --with-deps chromium && \
+    yes | /openhands/micromamba/bin/micromamba run -n openhands poetry run playwright install chromium && \
     # Set environment variables
     echo "OH_INTERPRETER_PATH=$(/openhands/micromamba/bin/micromamba run -n openhands poetry run python -c "import sys; print(sys.executable)")" >> /etc/environment && \
     # Clear caches
@@ -99,8 +107,10 @@ RUN \
     chmod -R g+rws /openhands/poetry && \
     mkdir -p /openhands/workspace && chmod -R g+rws,o+rw /openhands/workspace && \
     # Clean up
-    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
-    /openhands/micromamba/bin/micromamba clean --all
+    apt-get clean -y && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    yes | /openhands/micromamba/bin/micromamba clean --all --force-pkgs-dirs
 
 {% endmacro %}
 
@@ -120,8 +130,8 @@ RUN mkdir -p /openhands/micromamba/bin && \
     /openhands/micromamba/bin/micromamba config list
 
 # Create the openhands virtual environment and install poetry and python
-RUN /openhands/micromamba/bin/micromamba create -n openhands -y && \
-    /openhands/micromamba/bin/micromamba install -n openhands -c conda-forge poetry python=3.12 -y
+RUN CONDA_ALWAYS_YES=true /openhands/micromamba/bin/micromamba create -n openhands -y && \
+    CONDA_ALWAYS_YES=true /openhands/micromamba/bin/micromamba install -n openhands -c conda-forge poetry python=3.12 -y
 
 # Create a clean openhands directory including only the pyproject.toml, poetry.lock and openhands/__init__.py
 RUN \
