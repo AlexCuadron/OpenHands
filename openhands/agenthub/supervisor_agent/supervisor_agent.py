@@ -72,6 +72,7 @@ class SupervisorAgent(Agent):
         llm: LLM,
         config: AgentConfig,
         skip_git_commands: bool = False,  # Add parameter for testing
+        max_codeact_turns: int = 40,  # Maximum number of turns for CodeActAgent
     ) -> None:
         """Initializes a new instance of the SupervisorAgent class.
 
@@ -79,6 +80,7 @@ class SupervisorAgent(Agent):
         - llm (LLM): The llm to be used by this agent
         - config (AgentConfig): The configuration for this agent
         - skip_git_commands (bool): If True, skip git commands (for testing)
+        - max_codeact_turns (int): Maximum number of turns for CodeActAgent before evaluation
         """
         super().__init__(llm, config)
         self.pending_actions: deque[Action] = deque()
@@ -87,6 +89,7 @@ class SupervisorAgent(Agent):
         self.finished = False
         self.pre_delegation_commit: Optional[str] = None
         self.skip_git_commands = skip_git_commands  # Store the flag
+        self.max_codeact_turns = max_codeact_turns  # Store the max turns limit
 
     def reset(self) -> None:
         """Resets the Supervisor Agent."""
@@ -100,6 +103,7 @@ class SupervisorAgent(Agent):
         # Clear delegated_state from extra_data if it exists
         if hasattr(self, 'state') and hasattr(self.state, 'extra_data'):
             self.state.extra_data.pop('delegated_state', None)
+            self.state.extra_data.pop('codeact_turns', None)
 
     def get_descriptive_finish_reason(self, finish_reason: str) -> str:
         """Convert basic finish reasons into more descriptive ones."""
@@ -513,9 +517,7 @@ If the trajectory is good (score 0-3), set "pattern_observed" to null.
                 agent_responses.append((i, content))
             elif isinstance(event, Observation):
                 observations.append((i, event))
-        import pdb
 
-        pdb.set_trace()
         # Pair responses with observations
         for i in range(len(agent_responses) - 1):
             response_idx, response = agent_responses[i]
@@ -616,9 +618,6 @@ If the trajectory is good (score 0-3), set "pattern_observed" to null.
                 formatted_output += (
                     f"\nFINISH REASON: {output_data['final_finish_reason']}\n"
                 )
-        import pdb
-
-        pdb.set_trace()
         return formatted_output
 
     def step(self, state: State) -> Action:
@@ -702,12 +701,13 @@ If the trajectory is good (score 0-3), set "pattern_observed" to null.
                 state.extra_data.pop('restart_reason', None)
                 state.extra_data.pop('max_iterations_reached', None)
                 state.extra_data.pop('max_iterations_reason', None)
-                # Update delegated state
+                # Update delegated state and reset turn counter
                 self.delegated = True
                 state.extra_data['delegated_state'] = True
+                state.extra_data['codeact_turns'] = 0  # Reset turn counter
                 return AgentDelegateAction(
                     agent='CodeActAgent',
-                    inputs={"issue": state.get_last_user_message()},
+                    inputs={'issue': state.get_last_user_message()},
                     thought="I'll delegate this task to CodeActAgent again with a fresh approach.",
                     clear_history=True,
                 )
@@ -722,9 +722,10 @@ If the trajectory is good (score 0-3), set "pattern_observed" to null.
                 logger.info('SupervisorAgent: Skipping git commands (for testing)')
                 self.delegated = True
                 state.extra_data['delegated_state'] = True
+                state.extra_data['codeact_turns'] = 0  # Reset turn counter
                 return AgentDelegateAction(
                     agent='CodeActAgent',
-                    inputs={"issue": state.get_last_user_message()},
+                    inputs={'issue': state.get_last_user_message()},
                     thought="I'll delegate this task to CodeActAgent to handle it.",
                     clear_history=True,
                 )
@@ -758,10 +759,11 @@ If the trajectory is good (score 0-3), set "pattern_observed" to null.
                         'SupervisorAgent: Delegating to CodeActAgent with clear_history=True'
                     )
                     state.extra_data['delegated_state'] = True
+                    state.extra_data['codeact_turns'] = 0  # Reset turn counter
                     self.delegated = True
                     return AgentDelegateAction(
                         agent='CodeActAgent',
-                        inputs={"issue": state.get_last_user_message()},
+                        inputs={'issue': state.get_last_user_message()},
                         thought="I'll delegate this task to CodeActAgent to handle it.",
                         clear_history=True,
                     )
@@ -772,8 +774,17 @@ If the trajectory is good (score 0-3), set "pattern_observed" to null.
                 thought='Checking if there are any changes to commit before delegation',
             )
 
-        # Check if the delegated agent has finished
+        # Check if the delegated agent has finished or reached the turn limit
         delegate_observation_found = False
+
+        # Initialize codeact_turns counter if not present
+        if 'codeact_turns' not in state.extra_data:
+            state.extra_data['codeact_turns'] = 0
+
+        # Get the current number of turns used by CodeActAgent
+        codeact_turns = state.extra_data.get('codeact_turns', 0)
+
+        # Check if we have a delegate observation
         for event in reversed(state.history):
             if isinstance(event, AgentDelegateObservation) or (
                 hasattr(event, 'observation')
@@ -781,6 +792,25 @@ If the trajectory is good (score 0-3), set "pattern_observed" to null.
             ):
                 delegate_observation_found = True
                 break
+
+        # Check if we've reached the turn limit for CodeActAgent
+        turn_limit_reached = False
+        if self.delegated and not delegate_observation_found:
+            # Count the number of events in the delegated history
+            if hasattr(state, 'extra_data') and 'delegated_state' in state.extra_data:
+                # Increment the turn counter
+                state.extra_data['codeact_turns'] += 1
+                codeact_turns = state.extra_data['codeact_turns']
+                logger.info(
+                    f'SupervisorAgent: CodeActAgent turn count: {codeact_turns}/{self.max_codeact_turns}'
+                )
+
+                # Check if we've reached the limit
+                if codeact_turns >= self.max_codeact_turns:
+                    logger.info(
+                        f'SupervisorAgent: CodeActAgent has reached the turn limit ({self.max_codeact_turns})'
+                    )
+                    turn_limit_reached = True
 
             # Check for git command observations and update state accordingly
             if (
@@ -806,14 +836,25 @@ If the trajectory is good (score 0-3), set "pattern_observed" to null.
                 )
 
         # Process history and run overthinking analysis if there are at least 5 events in the history
+        # or if the turn limit has been reached
         overthinking_detected = False
-        if len(state.history) >= 5:
+        if len(state.history) >= 5 or turn_limit_reached:
             # Process the history of actions and observations
             processed_history = self.process_history_with_observations(state)
             state.extra_data['processed_history'] = processed_history
 
             # Analyze the trajectory for overthinking
-            logger.info('SupervisorAgent: Analyzing trajectory for overthinking')
+            if turn_limit_reached:
+                logger.info(
+                    'SupervisorAgent: Turn limit reached, analyzing trajectory for overthinking'
+                )
+                state.extra_data['max_iterations_reached'] = True
+                state.extra_data['max_iterations_reason'] = (
+                    f'CodeActAgent reached the maximum number of turns ({self.max_codeact_turns})'
+                )
+            else:
+                logger.info('SupervisorAgent: Analyzing trajectory for overthinking')
+
             overthinking_analysis = self.analyze_trajectory(processed_history)
 
             # Store the overthinking analysis in the state's extra_data
@@ -828,6 +869,13 @@ If the trajectory is good (score 0-3), set "pattern_observed" to null.
                     overthinking_detected = True
                     logger.info(
                         'SupervisorAgent: Detected overthinking, restarting task with CodeActAgent'
+                    )
+                elif turn_limit_reached:
+                    # If we reached the turn limit but no overthinking was detected,
+                    # we still need to restart with a fresh approach
+                    overthinking_detected = True
+                    logger.info(
+                        'SupervisorAgent: Turn limit reached but no overthinking detected, still restarting task with CodeActAgent'
                     )
 
                     # When overthinking is detected, we don't collect the git patch
@@ -854,28 +902,41 @@ If the trajectory is good (score 0-3), set "pattern_observed" to null.
                         state.extra_data.pop('max_iterations_reason', None)
                         self.delegated = True
                         state.extra_data['delegated_state'] = True
+                        state.extra_data['codeact_turns'] = 0  # Reset turn counter
                         return AgentDelegateAction(
                             agent='CodeActAgent',
-                            inputs={"issue": state.get_last_user_message()},
+                            inputs={'issue': state.get_last_user_message()},
                             thought="I'll delegate this task to CodeActAgent again with a fresh approach.",
                             clear_history=True,
                         )
 
                     # Return a message action explaining the restart without git patch in outputs
-                    return MessageAction(
-                        content=(
+                    message_content = ""
+                    if (
+                        turn_limit_reached
+                        and overthinking_analysis['pattern_observed'] is None
+                    ):
+                        message_content = (
+                            f"CodeActAgent has reached the maximum number of turns ({self.max_codeact_turns}). "
+                            f"Although no overthinking was detected (score: {overthinking_analysis['overthinking_score']}), "
+                            f"I'm restarting the task with a fresh approach to ensure progress."
+                        )
+                    else:
+                        message_content = (
                             f"I've detected overthinking in the CodeActAgent's approach "
                             f"(score: {overthinking_analysis['overthinking_score']}, "
                             f"patterns: {overthinking_analysis['pattern_observed']}). "
                             f"Restarting the task with a fresh approach."
                         )
-                    )
+                    
+                    return MessageAction(content=message_content)
 
-        # If delegate observation was found, no overthinking was detected, and history >= 5, finish normally
+        # If delegate observation was found, no overthinking was detected, history >= 5, and turn limit wasn't reached, finish normally
         if (
             delegate_observation_found
             and not overthinking_detected
             and len(state.history) >= 5
+            and not turn_limit_reached
         ):
             self.finished = True
 
