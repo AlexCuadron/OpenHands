@@ -21,6 +21,7 @@ from evaluation.utils.shared import (
     prepare_dataset,
     reset_logger_for_multiprocessing,
     run_evaluation,
+    update_llm_config_for_completions_logging,
 )
 from openhands.controller.state.state import State
 from openhands.core.config import (
@@ -45,6 +46,7 @@ SKIP_NUM = (
 
 
 def get_config(
+    instance: pd.Series,
     metadata: EvalMetadata,
 ) -> AppConfig:
     sandbox_config = get_default_sandbox_config_for_eval()
@@ -59,7 +61,13 @@ def get_config(
         workspace_base=None,
         workspace_mount_path=None,
     )
-    config.set_llm_config(metadata.llm_config)
+    # Update llm_config to enable completions logging
+    llm_config = update_llm_config_for_completions_logging(
+        metadata.llm_config,
+        metadata.eval_output_dir,
+        str(instance.instance_id)
+    )
+    config.set_llm_config(llm_config)
     agent_config = config.get_agent_config(metadata.agent_class)
     agent_config.enable_prompt_extensions = False
 
@@ -162,7 +170,7 @@ def process_instance(
     metadata: EvalMetadata,
     reset_logger: bool = True,
 ) -> EvalOutput:
-    config = get_config(metadata)
+    config = get_config(instance, metadata)
 
     # Setup the logger properly, so you can run multi-processing to parallelize the evaluation
     if reset_logger:
@@ -276,6 +284,15 @@ if __name__ == '__main__':
     if llm_config is None:
         raise ValueError(f'Could not find LLM config: --llm_config {args.llm_config}')
 
+    # Create details dictionary with agent configuration
+    agent_details = {
+        "agent_config": {
+            "codeact_enable_jupyter": False,
+            "codeact_enable_browsing": False,
+            "codeact_enable_llm_editor": False,
+        }
+    }
+    
     metadata = make_metadata(
         llm_config,
         'AiderBench',
@@ -283,6 +300,7 @@ if __name__ == '__main__':
         args.max_iterations,
         args.eval_note,
         args.eval_output_dir,
+        details=agent_details,
     )
     output_file = os.path.join(metadata.eval_output_dir, 'output.jsonl')
 
