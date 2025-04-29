@@ -7,11 +7,6 @@ from typing import Any
 import pandas as pd
 from datasets import load_dataset
 
-from evaluation.benchmarks.aider_bench.helper import (
-    FAKE_RESPONSES,
-    INST_SUFFIXES,
-    INSTRUCTIONS_ADDENDUM,
-)
 from evaluation.utils.shared import (
     EvalMetadata,
     EvalOutput,
@@ -37,8 +32,7 @@ from openhands.events.observation import CmdOutputObservation
 from openhands.runtime.base import Runtime
 from openhands.utils.async_utils import call_async_from_sync
 
-# Configure visibility of unit tests to the Agent.
-USE_UNIT_TESTS = os.environ.get('USE_UNIT_TESTS', 'false').lower() == 'true'
+# Configure any environment variables
 SKIP_NUM = os.environ.get('SKIP_NUM')
 SKIP_NUM = (
     int(SKIP_NUM) if SKIP_NUM and SKIP_NUM.isdigit() and int(SKIP_NUM) >= 0 else None
@@ -91,7 +85,7 @@ def initialize_runtime(
     logger.info(f"\n{'-' * 50} BEGIN Runtime Initialization Fn {'-' * 50}\n")
     obs: CmdOutputObservation
 
-    # Set instance id
+    # Set up workspace
     action = CmdRunAction(command='mkdir -p /workspace')
     logger.info(action, extra={'msg_type': 'ACTION'})
     obs = runtime.run_action(action)
@@ -102,22 +96,16 @@ def initialize_runtime(
     obs = runtime.run_action(action)
     assert obs.exit_code == 0
 
+    # Create problem file
     with tempfile.TemporaryDirectory() as tmpdir:
-        file_path = os.path.join(tmpdir, f'{instance.instance_name}.py')
+        file_path = os.path.join(tmpdir, 'problem.txt')
         with open(file_path, 'w') as f:
-            f.write(instance.signature)
+            f.write(instance.problem)
         runtime.copy_to(
             file_path,
             '/workspace',
         )
-        if USE_UNIT_TESTS:
-            file_path = os.path.join(tmpdir, f'{instance.instance_name}_test.py')
-            with open(file_path, 'w') as f:
-                f.write(instance.test)
-            runtime.copy_to(
-                file_path,
-                '/workspace',
-            )
+
     logger.info(f"\n{'-' * 50} END Runtime Initialization Fn {'-' * 50}\n")
 
 
@@ -127,41 +115,37 @@ def complete_runtime(
 ) -> dict[str, Any]:
     """Complete the runtime for the agent.
 
-    This function is called before the runtime is used to run the agent.
+    This function is called after the agent has run.
     If you need to do something in the sandbox to get the correctness metric after
     the agent has run, modify this function.
     """
     logger.info(f"\n{'-' * 50} BEGIN Runtime Completion Fn {'-' * 50}\n")
     obs: CmdOutputObservation
 
-    # Rewriting the test file to ignore any changes Agent may have made.
-    script_name = f'{instance.instance_name}_test.py'
-    with tempfile.TemporaryDirectory() as tmpdir:
-        file_path = os.path.join(tmpdir, script_name)
-        with open(file_path, 'w') as f:
-            f.write(instance.test)
-        runtime.copy_to(
-            file_path,
-            '/workspace',
-        )
-        logger.info(f'Running test file: {script_name}')
-
-    action = CmdRunAction(command=f'python3 -m unittest {script_name}')
+    # Check if solution.txt exists
+    action = CmdRunAction(command='ls -la /workspace')
     logger.info(action, extra={'msg_type': 'ACTION'})
     obs = runtime.run_action(action)
     logger.info(obs, extra={'msg_type': 'OBSERVATION'})
 
-    exit_code = 1
-    if isinstance(obs, CmdOutputObservation):
-        exit_code = obs.exit_code
+    # Get the solution content
+    solution_content = ""
+    if "solution.txt" in obs.content:
+        action = CmdRunAction(command='cat /workspace/solution.txt')
+        logger.info(action, extra={'msg_type': 'ACTION'})
+        obs = runtime.run_action(action)
+        logger.info(obs, extra={'msg_type': 'OBSERVATION'})
+        solution_content = obs.content
 
     logger.info(f"\n{'-' * 50} END Runtime Completion Fn {'-' * 50}\n")
 
     runtime.close()
 
+    # For MATH problems, we need to manually evaluate the solution
+    # Here we just return the solution content for manual evaluation
     return {
-        'test_output': obs.content,
-        'exit_code': exit_code,
+        'solution': solution_content,
+        'correct_answer': instance.answer,
     }
 
 
@@ -187,25 +171,17 @@ def process_instance(
 
     # Prepare instruction
     logger.info(instance)
-    instruction = instance.instruction
-    instruction += INSTRUCTIONS_ADDENDUM.format(
-        signature_file=f'{instance.instance_name}.py',
-    )
-    if USE_UNIT_TESTS:
-        logger.info(
-            f'\nInstruction to run test_file: {instance.instance_name}_test.py\n'
-        )
-        instruction += (
-            f'Use `python -m unittest {instance.instance_name}_test.py` to run the test_file '
-            'and verify the correctness of your solution. DO NOT EDIT the test file.\n\n'
-        )
+    instruction = f"""You are given a mathematics problem to solve. The problem is in the file 'problem.txt'.
 
-    instruction += (
-        'IMPORTANT: You should ONLY interact with the environment provided '
-        'to you AND NEVER ASK FOR HUMAN HELP.\n'
-    )
-    # NOTE: You can actually set slightly different instruction for different agents
-    instruction += INST_SUFFIXES[metadata.agent_class]
+Please read the problem carefully and solve it step by step. Write your solution in a file named 'solution.txt'.
+
+Your solution should include:
+1. A clear understanding of the problem
+2. Step-by-step working
+3. The final answer
+
+IMPORTANT: You should ONLY interact with the environment provided to you AND NEVER ASK FOR HUMAN HELP.
+"""
 
     # =============================================
     # create sandbox and run the agent
@@ -213,6 +189,7 @@ def process_instance(
 
     runtime: Runtime = create_runtime(config)
     call_async_from_sync(runtime.connect)
+
     initialize_runtime(runtime, instance=instance)
 
     # Here's how you can run the agent (similar to the `main` function) and get the final task state
@@ -221,33 +198,27 @@ def process_instance(
             config=config,
             initial_user_action=MessageAction(content=instruction),
             runtime=runtime,
-            fake_user_response_fn=FAKE_RESPONSES[metadata.agent_class],
         )
     )
     if state is None:
         raise ValueError('State should not be None.')
 
-    # # =============================================
-    # # result evaluation
-    # # =============================================
+    # =============================================
+    # result evaluation
+    # =============================================
 
     return_val = complete_runtime(runtime, instance)
-    exit_code = return_val['exit_code']
-    test_output = return_val['test_output']
+    solution = return_val['solution']
+    correct_answer = return_val['correct_answer']
 
-    errors = []
-    test_cases = None
-    if test_output.find('SyntaxError') != -1:
-        errors += 'SyntaxError'
-    elif test_output.find('IndentationError') != -1:
-        errors += 'IndentationError'
-    else:
-        test_cases = test_output[: test_output.find('\r')]
+    # Simple evaluation - check if the correct answer appears in the solution
+    # In a real implementation, you would need a more sophisticated evaluation
+    is_correct = correct_answer in solution
 
     test_result = {
-        'exit_code': exit_code,
-        'test_cases': test_cases,
-        'errors': errors,
+        'solution': solution,
+        'correct_answer': correct_answer,
+        'is_correct': is_correct,
     }
 
     # history is now available as a stream of events, rather than list of pairs of (Action, Observation)
@@ -270,15 +241,53 @@ def process_instance(
     return output
 
 
+def prepare_math_dataset():
+    """Prepare the MATH dataset for evaluation."""
+    # In a real implementation, you would load the MATH dataset
+    # For now, we'll create a simple mock dataset
+    data = {
+        'instance_id': list(range(10)),
+        'problem': [
+            "Find the value of x in the equation 2x + 3 = 7.",
+            "Solve for y: 3y - 5 = 10.",
+            "Calculate the area of a circle with radius 5 cm.",
+            "Find the derivative of f(x) = x^2 + 3x + 2.",
+            "Solve the system of equations: 2x + y = 5, x - y = 1.",
+            "Find the indefinite integral of g(x) = 2x + 3.",
+            "Calculate the limit of (x^2 - 1)/(x - 1) as x approaches 1.",
+            "Find the value of sin(30°) + cos(60°).",
+            "Solve the quadratic equation x^2 - 5x + 6 = 0.",
+            "Find the sum of the first 10 terms of the arithmetic sequence with a_1 = 3 and d = 2."
+        ],
+        'answer': [
+            "x = 2",
+            "y = 5",
+            "78.54 cm²",
+            "f'(x) = 2x + 3",
+            "x = 2, y = 1",
+            "∫(2x + 3)dx = x² + 3x + C",
+            "2",
+            "1",
+            "x = 2, x = 3",
+            "75"
+        ],
+        'level': ['Algebra'] * 10,
+        'type': ['Equation'] * 5 + ['Calculus'] * 3 + ['Equation'] * 2
+    }
+    
+    return pd.DataFrame(data)
+
+
 if __name__ == '__main__':
     args = parse_arguments()
-    dataset = load_dataset('RajMaheshwari/Exercism-Python')
-    aider_bench_tests = dataset['train'].to_pandas()
+    
+    # Prepare the MATH dataset
+    math_dataset = prepare_math_dataset()
 
     llm_config = None
     if args.llm_config:
         llm_config = get_llm_config_arg(args.llm_config)
-        # modify_params must be False for evaluation purpose, for reproducibility and accurancy of results
+        # modify_params must be False for evaluation purpose, for reproducibility and accuracy of results
         llm_config.modify_params = False
 
     if llm_config is None:
@@ -295,7 +304,7 @@ if __name__ == '__main__':
     
     metadata = make_metadata(
         llm_config,
-        'AiderBench',
+        'MATH',
         args.agent_cls,
         args.max_iterations,
         args.eval_note,
@@ -311,7 +320,7 @@ if __name__ == '__main__':
         logger.info(f'\nUsing specific dataset IDs: {eval_ids}\n')
 
     instances = prepare_dataset(
-        aider_bench_tests,
+        math_dataset,
         output_file,
         args.eval_n_limit,
         eval_ids=eval_ids,

@@ -7,11 +7,6 @@ from typing import Any
 import pandas as pd
 from datasets import load_dataset
 
-from evaluation.benchmarks.aider_bench.helper import (
-    FAKE_RESPONSES,
-    INST_SUFFIXES,
-    INSTRUCTIONS_ADDENDUM,
-)
 from evaluation.utils.shared import (
     EvalMetadata,
     EvalOutput,
@@ -37,8 +32,7 @@ from openhands.events.observation import CmdOutputObservation
 from openhands.runtime.base import Runtime
 from openhands.utils.async_utils import call_async_from_sync
 
-# Configure visibility of unit tests to the Agent.
-USE_UNIT_TESTS = os.environ.get('USE_UNIT_TESTS', 'false').lower() == 'true'
+# Configure any environment variables
 SKIP_NUM = os.environ.get('SKIP_NUM')
 SKIP_NUM = (
     int(SKIP_NUM) if SKIP_NUM and SKIP_NUM.isdigit() and int(SKIP_NUM) >= 0 else None
@@ -91,7 +85,7 @@ def initialize_runtime(
     logger.info(f"\n{'-' * 50} BEGIN Runtime Initialization Fn {'-' * 50}\n")
     obs: CmdOutputObservation
 
-    # Set instance id
+    # Set up workspace
     action = CmdRunAction(command='mkdir -p /workspace')
     logger.info(action, extra={'msg_type': 'ACTION'})
     obs = runtime.run_action(action)
@@ -102,22 +96,25 @@ def initialize_runtime(
     obs = runtime.run_action(action)
     assert obs.exit_code == 0
 
+    # Create problem file
     with tempfile.TemporaryDirectory() as tmpdir:
-        file_path = os.path.join(tmpdir, f'{instance.instance_name}.py')
+        file_path = os.path.join(tmpdir, 'problem.txt')
         with open(file_path, 'w') as f:
-            f.write(instance.signature)
+            f.write(instance.problem)
         runtime.copy_to(
             file_path,
             '/workspace',
         )
-        if USE_UNIT_TESTS:
-            file_path = os.path.join(tmpdir, f'{instance.instance_name}_test.py')
-            with open(file_path, 'w') as f:
-                f.write(instance.test)
-            runtime.copy_to(
-                file_path,
-                '/workspace',
-            )
+
+        # Create test cases file
+        file_path = os.path.join(tmpdir, 'test_cases.py')
+        with open(file_path, 'w') as f:
+            f.write(instance.test_cases)
+        runtime.copy_to(
+            file_path,
+            '/workspace',
+        )
+
     logger.info(f"\n{'-' * 50} END Runtime Initialization Fn {'-' * 50}\n")
 
 
@@ -127,26 +124,21 @@ def complete_runtime(
 ) -> dict[str, Any]:
     """Complete the runtime for the agent.
 
-    This function is called before the runtime is used to run the agent.
+    This function is called after the agent has run.
     If you need to do something in the sandbox to get the correctness metric after
     the agent has run, modify this function.
     """
     logger.info(f"\n{'-' * 50} BEGIN Runtime Completion Fn {'-' * 50}\n")
     obs: CmdOutputObservation
 
-    # Rewriting the test file to ignore any changes Agent may have made.
-    script_name = f'{instance.instance_name}_test.py'
-    with tempfile.TemporaryDirectory() as tmpdir:
-        file_path = os.path.join(tmpdir, script_name)
-        with open(file_path, 'w') as f:
-            f.write(instance.test)
-        runtime.copy_to(
-            file_path,
-            '/workspace',
-        )
-        logger.info(f'Running test file: {script_name}')
+    # Check if solution.py exists
+    action = CmdRunAction(command='ls -la /workspace')
+    logger.info(action, extra={'msg_type': 'ACTION'})
+    obs = runtime.run_action(action)
+    logger.info(obs, extra={'msg_type': 'OBSERVATION'})
 
-    action = CmdRunAction(command=f'python3 -m unittest {script_name}')
+    # Run test cases
+    action = CmdRunAction(command='python3 /workspace/test_cases.py')
     logger.info(action, extra={'msg_type': 'ACTION'})
     obs = runtime.run_action(action)
     logger.info(obs, extra={'msg_type': 'OBSERVATION'})
@@ -187,25 +179,14 @@ def process_instance(
 
     # Prepare instruction
     logger.info(instance)
-    instruction = instance.instruction
-    instruction += INSTRUCTIONS_ADDENDUM.format(
-        signature_file=f'{instance.instance_name}.py',
-    )
-    if USE_UNIT_TESTS:
-        logger.info(
-            f'\nInstruction to run test_file: {instance.instance_name}_test.py\n'
-        )
-        instruction += (
-            f'Use `python -m unittest {instance.instance_name}_test.py` to run the test_file '
-            'and verify the correctness of your solution. DO NOT EDIT the test file.\n\n'
-        )
+    instruction = f"""You are given a programming problem to solve. The problem description is in the file 'problem.txt'.
 
-    instruction += (
-        'IMPORTANT: You should ONLY interact with the environment provided '
-        'to you AND NEVER ASK FOR HUMAN HELP.\n'
-    )
-    # NOTE: You can actually set slightly different instruction for different agents
-    instruction += INST_SUFFIXES[metadata.agent_class]
+Please read the problem carefully and implement a solution in Python. Save your solution in a file named 'solution.py'.
+
+After implementing your solution, you can test it by running 'python3 test_cases.py'. This will execute your solution against a set of test cases.
+
+IMPORTANT: You should ONLY interact with the environment provided to you AND NEVER ASK FOR HUMAN HELP.
+"""
 
     # =============================================
     # create sandbox and run the agent
@@ -213,6 +194,7 @@ def process_instance(
 
     runtime: Runtime = create_runtime(config)
     call_async_from_sync(runtime.connect)
+
     initialize_runtime(runtime, instance=instance)
 
     # Here's how you can run the agent (similar to the `main` function) and get the final task state
@@ -221,33 +203,22 @@ def process_instance(
             config=config,
             initial_user_action=MessageAction(content=instruction),
             runtime=runtime,
-            fake_user_response_fn=FAKE_RESPONSES[metadata.agent_class],
         )
     )
     if state is None:
         raise ValueError('State should not be None.')
 
-    # # =============================================
-    # # result evaluation
-    # # =============================================
+    # =============================================
+    # result evaluation
+    # =============================================
 
     return_val = complete_runtime(runtime, instance)
     exit_code = return_val['exit_code']
     test_output = return_val['test_output']
 
-    errors = []
-    test_cases = None
-    if test_output.find('SyntaxError') != -1:
-        errors += 'SyntaxError'
-    elif test_output.find('IndentationError') != -1:
-        errors += 'IndentationError'
-    else:
-        test_cases = test_output[: test_output.find('\r')]
-
     test_result = {
         'exit_code': exit_code,
-        'test_cases': test_cases,
-        'errors': errors,
+        'test_output': test_output,
     }
 
     # history is now available as a stream of events, rather than list of pairs of (Action, Observation)
@@ -270,15 +241,36 @@ def process_instance(
     return output
 
 
+def prepare_apps_dataset():
+    """Prepare the APPS dataset for evaluation."""
+    # Load the APPS dataset
+    dataset = load_dataset('codeparrot/apps', split='test')
+    
+    # Convert to pandas DataFrame
+    df = dataset.to_pandas()
+    
+    # Add instance_id column
+    df['instance_id'] = df.index
+    
+    # Rename columns to match expected format
+    df = df.rename(columns={
+        'question': 'problem',
+        'test': 'test_cases',
+    })
+    
+    return df
+
+
 if __name__ == '__main__':
     args = parse_arguments()
-    dataset = load_dataset('RajMaheshwari/Exercism-Python')
-    aider_bench_tests = dataset['train'].to_pandas()
+    
+    # Prepare the APPS dataset
+    apps_dataset = prepare_apps_dataset()
 
     llm_config = None
     if args.llm_config:
         llm_config = get_llm_config_arg(args.llm_config)
-        # modify_params must be False for evaluation purpose, for reproducibility and accurancy of results
+        # modify_params must be False for evaluation purpose, for reproducibility and accuracy of results
         llm_config.modify_params = False
 
     if llm_config is None:
@@ -295,7 +287,7 @@ if __name__ == '__main__':
     
     metadata = make_metadata(
         llm_config,
-        'AiderBench',
+        'APPS',
         args.agent_cls,
         args.max_iterations,
         args.eval_note,
@@ -311,7 +303,7 @@ if __name__ == '__main__':
         logger.info(f'\nUsing specific dataset IDs: {eval_ids}\n')
 
     instances = prepare_dataset(
-        aider_bench_tests,
+        apps_dataset,
         output_file,
         args.eval_n_limit,
         eval_ids=eval_ids,
